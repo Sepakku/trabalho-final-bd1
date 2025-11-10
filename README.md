@@ -14,3 +14,7 @@ esquema deve ter no mínimo 25 registros.
 
 7) A definição das consultas SQL utilizadas pela aplicação.
 8) A construção do backend e do frontend para a aplicação
+
+## Diagrama Conceitual
+
+![Diagrama Entidade-Relacionamento Estendido do Sistema SI Market](Diagrama/DEER%20final%20(min,max).drawio.png)
