@@ -1,4 +1,4 @@
-from backend.serviços.database.conector import DatabaseManager
+from backend.servicos.database.conector import DatabaseManager
 
 
 class ProdutoDatabase:
