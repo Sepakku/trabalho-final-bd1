@@ -9,4 +9,6 @@ def getprodutos():
     origem = request.args.get("origem", "")
     loja = request.args.get("loja", "")
     categoria = request.args.get("categoria", "")
-    return jsonify(ProdutoDatabase().get_produto(origem, loja, categoria)), 200
+    preco_min = request.args.get("preco_min", "")
+    preco_max = request.args.get("preco_max", "")
+    return jsonify(ProdutoDatabase().get_produto(origem, loja, categoria, preco_min, preco_max)), 200

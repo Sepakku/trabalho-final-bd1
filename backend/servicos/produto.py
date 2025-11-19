@@ -5,7 +5,8 @@ class ProdutoDatabase:
     def __init__(self, db_provider=DatabaseManager()) -> None:
         self.db = db_provider
 
-    def get_produto(self, origem: str, loja: str, categoria: str):
+    # Função para consultar os produtos com filtros de origem, loja, categoria e intervalos de preço
+    def get_produto(self, origem: str, loja: str, categoria: str, min_p: str, max_p: str):
         query = """
                 SELECT 
                     p.alerta_estoque, 
@@ -37,5 +38,17 @@ class ProdutoDatabase:
                 query += f"AND cat.nome_categoria = '{categoria}'\n"
             else:
                 query += f"WHERE cat.nome_categoria = '{categoria}'\n"
+
+        if min_p:
+            if "WHERE" in query:
+                query += f"AND p.preco >= {min_p}\n"
+            else:
+                query += f"WHERE p.preco >= {min_p}\n"
+
+        if max_p:
+            if "WHERE" in query:
+                query += f"AND p.preco <= {max_p}\n"
+            else:
+                query += f"WHERE p.preco <= {max_p}\n"
 
         return self.db.execute_select_all(query)
