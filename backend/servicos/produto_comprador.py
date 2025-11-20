@@ -1,7 +1,7 @@
 from backend.servicos.database.conector import DatabaseManager
 
 
-class ProdutoDatabase:
+class ProdutoCompradorDatabase:
     def __init__(self, db_provider=DatabaseManager()) -> None:
         self.db = db_provider
 
