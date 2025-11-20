@@ -6,7 +6,7 @@ class ProdutoDatabase:
         self.db = db_provider
 
     # Função para consultar os produtos com filtros de nome, origem, loja, categoria, intervalos de preço, bem avaliado
-    def get_produto(self, nome: str, origem: str, loja: str, categoria: str, min_p: str, max_p: str, bem_avaliado: str):
+    def get_produto_comprador(self, nome: str, origem: str, loja: str, categoria: str, min_p: str, max_p: str, bem_avaliado: str):
         query = """
                 SELECT 
                     p.alerta_estoque, 

@@ -1,11 +1,11 @@
 from flask import Blueprint, jsonify, request
-from backend.servicos.produto import ProdutoDatabase
+from backend.servicos.produto_comprador import ProdutoDatabase
 
-produtos_blueprint = Blueprint("produto", __name__)
+produtos_comprador_blueprint = Blueprint("produto_comprador", __name__)
 
 
-@produtos_blueprint.route("/produtos", methods=["GET"])
-def getprodutos():
+@produtos_comprador_blueprint.route("/produtos_comprador", methods=["GET"])
+def getprodutos_comprador():
     nome = request.args.get("nome", "")
     origem = request.args.get("origem", "")
     loja = request.args.get("loja", "")
@@ -13,4 +13,4 @@ def getprodutos():
     preco_min = request.args.get("preco_min", "")
     preco_max = request.args.get("preco_max", "")
     bem_avaliado = request.args.get("bem_avaliado", "")
-    return jsonify(ProdutoDatabase().get_produto(nome, origem, loja, categoria, preco_min, preco_max, bem_avaliado)), 200
+    return jsonify(ProdutoDatabase().get_produto_comprador(nome, origem, loja, categoria, preco_min, preco_max, bem_avaliado)), 200
