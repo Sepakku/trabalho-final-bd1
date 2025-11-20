@@ -62,6 +62,6 @@ class ProdutoDatabase:
                 """
 
         if bem_avaliado:
-            query += "\nHAVING AVG(a.nota) >= 4"
+            query += f"\nHAVING AVG(a.nota) >= {bem_avaliado}"
 
         return self.db.execute_select_all(query)
