@@ -324,7 +324,7 @@ INSERT INTO AssociaProd (cpf_cliente, data_pedido, data_solicitacao, id_produto)
 ('12345678900', '2025-10-21', '2025-10-22', 21),
 ('23456789001', '2025-10-22', '2025-10-23', 22),
 ('34567890122', '2025-10-23', '2025-10-24', 23),
-('45678901233', '2025-10-24', '2025-10-25', 24),
+('45678901233', '2025-10-24', '2025-10-25', 24);
 
 -- Inserção de dados na tabela AvaliaProd
 INSERT INTO AvaliaProd (cpf_comprador, id_produto, nota) VALUES
