@@ -16,9 +16,35 @@ def adicionar_carrinho():
         return jsonify({"error": "cpf e id_produto são obrigatórios"}), 400
     
     result = CompradorService().adicionar_ao_carrinho(cpf, id_produto, quantidade)
+    if result is None:
+        return jsonify({"error": "comprador_nao_existe", "message": "Comprador não encontrado. Por favor, cadastre-se primeiro."}), 404
     if result:
         return jsonify({"message": "Produto adicionado ao carrinho"}), 200
     return jsonify({"error": "Erro ao adicionar produto"}), 400
+
+
+@comprador_blueprint.route("/comprador/cadastrar", methods=["POST"])
+def cadastrar_comprador():
+    """Cadastra um novo comprador"""
+    json_data = request.get_json()
+    cpf = json_data.get("cpf")
+    pnome = json_data.get("pnome")
+    sobrenome = json_data.get("sobrenome")
+    cep = json_data.get("cep")
+    email = json_data.get("email")
+    senha = json_data.get("senha")
+    
+    if not cpf or not pnome or not sobrenome or not email or not senha:
+        return jsonify({"error": "cpf, pnome, sobrenome, email e senha são obrigatórios"}), 400
+    
+    # Hash simples da senha (em produção, usar bcrypt ou similar)
+    import hashlib
+    senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+    
+    success, message = CompradorService().criar_comprador(cpf, pnome, sobrenome, cep, email, senha_hash)
+    if success:
+        return jsonify({"message": message}), 201
+    return jsonify({"error": message}), 400
 
 
 @comprador_blueprint.route("/comprador/carrinho/<int:id_produto>", methods=["DELETE"])
@@ -63,7 +89,7 @@ def visualizar_pedido_detalhes():
 
 @comprador_blueprint.route("/comprador/pedido/finalizar", methods=["POST"])
 def finalizar_pedido():
-    """Finaliza pedido com método de pagamento e endereço"""
+    """Finaliza pedido com método de pagamento, método de entrega e endereço"""
     json_data = request.get_json()
     
     if not json_data:
@@ -71,17 +97,20 @@ def finalizar_pedido():
     
     cpf = json_data.get("cpf")
     metodo_pagamento = json_data.get("metodo_pagamento")  # credito, debito, pix
+    metodo_entrega = json_data.get("metodo_entrega")  # Correios, PAC, Motoboy
     endereco_entrega = json_data.get("endereco_entrega")
     
     if not cpf:
         return jsonify({"error": "CPF é obrigatório"}), 400
     if not metodo_pagamento:
         return jsonify({"error": "Método de pagamento é obrigatório"}), 400
+    if not metodo_entrega:
+        return jsonify({"error": "Método de entrega é obrigatório"}), 400
     if not endereco_entrega:
         return jsonify({"error": "Endereço de entrega é obrigatório"}), 400
     
     try:
-        result = CompradorService().finalizar_pedido(cpf, metodo_pagamento, endereco_entrega)
+        result = CompradorService().finalizar_pedido(cpf, metodo_pagamento, endereco_entrega, metodo_entrega)
         if result:
             return jsonify({"message": "Pedido finalizado com sucesso"}), 200
         else:
@@ -135,6 +164,17 @@ def criar_solicitacao():
     return jsonify({"error": "Erro ao criar solicitação"}), 400
 
 
+@comprador_blueprint.route("/comprador/produtos-comprados", methods=["GET"])
+def produtos_comprados():
+    """Retorna lista de produtos que o comprador já comprou"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    produtos = CompradorService().get_produtos_comprados(cpf)
+    return jsonify(produtos), 200
+
+
 @comprador_blueprint.route("/comprador/avaliacao", methods=["POST"])
 def avaliar_produto():
     """Avalia um produto"""
@@ -153,5 +193,5 @@ def avaliar_produto():
     result = CompradorService().avaliar_produto(cpf, id_produto, nota, comentario)
     if result:
         return jsonify({"message": "Produto avaliado com sucesso"}), 200
-    return jsonify({"error": "Erro ao avaliar produto"}), 400
+    return jsonify({"error": "Erro ao avaliar produto. Verifique se você comprou este produto."}), 400
 

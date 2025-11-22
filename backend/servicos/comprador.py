@@ -6,8 +6,49 @@ class CompradorService:
     def __init__(self, db_provider=DatabaseManager()) -> None:
         self.db = db_provider
 
+    def verificar_comprador_existe(self, cpf: str):
+        """Verifica se o comprador existe na tabela"""
+        query_comprador = "SELECT cpf_comprador FROM comprador WHERE cpf_comprador = %s"
+        comprador = self.db.execute_select_one(query_comprador, (cpf,))
+        return comprador is not None
+
+    def criar_comprador(self, cpf: str, pnome: str, sobrenome: str, cep: str, email: str, senha_hash: str):
+        """Cria um novo usuário e comprador"""
+        # Verifica se já existe usuário
+        query_usuario = "SELECT cpf FROM usuario WHERE cpf = %s"
+        usuario = self.db.execute_select_one(query_usuario, (cpf,))
+        
+        if usuario:
+            return False, "Usuário já existe com este CPF"
+        
+        # Verifica se já existe comprador
+        if self.verificar_comprador_existe(cpf):
+            return False, "Comprador já existe com este CPF"
+        
+        # Cria usuário
+        insert_usuario = """
+            INSERT INTO usuario (cpf, pnome, sobrenome, cep, email, senha_hash)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        if not self.db.execute_statement(insert_usuario, (cpf, pnome, sobrenome, cep or None, email, senha_hash)):
+            return False, "Erro ao criar usuário"
+        
+        # Cria comprador
+        insert_comprador = """
+            INSERT INTO comprador (cpf_comprador, num_compras)
+            VALUES (%s, 0)
+        """
+        if not self.db.execute_statement(insert_comprador, (cpf,)):
+            return False, "Erro ao criar comprador"
+        
+        return True, "Comprador criado com sucesso"
+
     def adicionar_ao_carrinho(self, cpf: str, id_produto: int, quantidade: int):
         """Adiciona produto ao carrinho (cria pedido pendente se não existir)"""
+        # Verifica se o comprador existe
+        if not self.verificar_comprador_existe(cpf):
+            return None  # Retorna None para indicar que comprador não existe
+        
         # Verifica se existe pedido pendente
         query_pedido = """
             SELECT cpf_cliente, data_pedido 
@@ -149,6 +190,7 @@ class CompradorService:
                 pg.status_pagamento,
                 pg.metodo_pagamento,
                 e.status_entrega,
+                e.metodo_entrega,
                 e.endereco_entrega
             FROM pedido p
             LEFT JOIN pagamento pg ON pg.fk_cpf_cliente = p.cpf_cliente 
@@ -215,6 +257,7 @@ class CompradorService:
                 pg.metodo_pagamento,
                 pg.valor_pago,
                 e.status_entrega,
+                e.metodo_entrega,
                 e.endereco_entrega,
                 e.data_envio,
                 e.data_prevista
@@ -245,6 +288,7 @@ class CompradorService:
                     pg.metodo_pagamento,
                     pg.valor_pago,
                     e.status_entrega,
+                    e.metodo_entrega,
                     e.endereco_entrega,
                     e.data_envio,
                     e.data_prevista
@@ -279,7 +323,7 @@ class CompradorService:
         
         return pedido
 
-    def finalizar_pedido(self, cpf: str, metodo_pagamento: str, endereco_entrega: str):
+    def finalizar_pedido(self, cpf: str, metodo_pagamento: str, endereco_entrega: str, metodo_entrega: str = None):
         """Finaliza pedido criando pagamento e entrega"""
         # Busca pedido pendente
         query_pedido = """
@@ -374,12 +418,12 @@ class CompradorService:
             # Cria entrega
             insert_entrega = """
                 INSERT INTO entrega (
-                    status_entrega, endereco_entrega, fk_cpf_cliente, fk_data_pedido, fk_cpf_vendedor
+                    status_entrega, metodo_entrega, endereco_entrega, fk_cpf_cliente, fk_data_pedido, fk_cpf_vendedor
                 )
-                VALUES ('preparando', %s, %s, %s, %s)
+                VALUES ('preparando', %s, %s, %s, %s, %s)
             """
             if not self.db.execute_statement(insert_entrega, (
-                endereco_entrega, cpf, data_pedido, cpf_vendedor
+                metodo_entrega, endereco_entrega, cpf, data_pedido, cpf_vendedor
             )):
                 print(f"Erro ao criar entrega para CPF: {cpf}")
                 return False
@@ -388,11 +432,12 @@ class CompradorService:
             update_entrega = """
                 UPDATE entrega
                 SET status_entrega = 'preparando',
+                    metodo_entrega = %s,
                     endereco_entrega = %s
                 WHERE fk_cpf_cliente = %s AND fk_data_pedido = %s
             """
             if not self.db.execute_statement(update_entrega, (
-                endereco_entrega, cpf, data_pedido
+                metodo_entrega, endereco_entrega, cpf, data_pedido
             )):
                 print(f"Erro ao atualizar entrega para CPF: {cpf}")
                 return False
@@ -578,10 +623,46 @@ class CompradorService:
             cpf, data_pedido_dt, data_solicitacao, tipo, status_solicitacao
         ))
 
+    def get_produtos_comprados(self, cpf: str):
+        """Retorna lista de produtos que o comprador já comprou (pedidos finalizados)"""
+        query = """
+            SELECT DISTINCT
+                p.id_produto,
+                p.nome_produto,
+                p.preco,
+                MAX(ped.data_pedido) as ultima_compra
+            FROM produto p
+            JOIN contemprod cp ON cp.id_produto = p.id_produto
+            JOIN pedido ped ON ped.cpf_cliente = cp.cpf_cliente 
+                AND ped.data_pedido = cp.data_pedido
+            WHERE ped.cpf_cliente = %s
+                AND ped.status_pedido != 'pendente'
+                AND ped.status_pedido != 'cancelado'
+            GROUP BY p.id_produto, p.nome_produto, p.preco
+            ORDER BY ultima_compra DESC, p.nome_produto
+        """
+        return self.db.execute_select_all(query, (cpf,))
+
     def avaliar_produto(self, cpf: str, id_produto: int, nota: int, comentario: str = ""):
         """Avalia ou atualiza avaliação de um produto"""
         if nota < 1 or nota > 5:
             return False
+        
+        # Verifica se o comprador realmente comprou este produto
+        query_comprou = """
+            SELECT 1 
+            FROM contemprod cp
+            JOIN pedido ped ON ped.cpf_cliente = cp.cpf_cliente 
+                AND ped.data_pedido = cp.data_pedido
+            WHERE cp.cpf_cliente = %s 
+                AND cp.id_produto = %s
+                AND ped.status_pedido != 'pendente'
+                AND ped.status_pedido != 'cancelado'
+            LIMIT 1
+        """
+        comprou = self.db.execute_select_one(query_comprou, (cpf, id_produto))
+        if not comprou:
+            return False  # Comprador não comprou este produto
         
         # Verifica se já existe avaliação
         query_existe = """

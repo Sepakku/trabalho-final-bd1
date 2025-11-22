@@ -150,6 +150,9 @@ function exibirProdutos(produtos) {
     `).join('');
 }
 
+// Variáveis globais para armazenar dados do produto que está sendo adicionado
+let produtoPendente = null;
+
 async function adicionarAoCarrinho(idProduto) {
     const cpf = obterCPFComprador();
     const quantidade = parseInt(document.getElementById(`qtd-produto-${idProduto}`).value) || 1;
@@ -169,12 +172,118 @@ async function adicionarAoCarrinho(idProduto) {
         const result = await response.json();
         if (response.ok) {
             mostrarMensagem('Produto adicionado ao carrinho!', 'success');
+            produtoPendente = null; // Limpa produto pendente
         } else {
-            mostrarMensagem(result.error || 'Erro ao adicionar produto', 'error');
+            // Verifica se o erro é porque o comprador não existe
+            if (result.error === 'comprador_nao_existe' || response.status === 404) {
+                // Armazena os dados do produto para adicionar depois do cadastro
+                produtoPendente = { idProduto, quantidade };
+                // Mostra o modal de cadastro
+                mostrarModalCadastro(cpf);
+            } else {
+                mostrarMensagem(result.error || 'Erro ao adicionar produto', 'error');
+            }
         }
     } catch (error) {
         console.error('Erro:', error);
         mostrarMensagem('Erro ao adicionar produto ao carrinho', 'error');
+    }
+}
+
+function mostrarModalCadastro(cpf) {
+    const modal = document.getElementById('modal-cadastro');
+    const cpfInput = document.getElementById('cadastro-cpf');
+    cpfInput.value = cpf;
+    modal.style.display = 'block';
+}
+
+function fecharModalCadastro() {
+    const modal = document.getElementById('modal-cadastro');
+    modal.style.display = 'none';
+    // Limpa o formulário
+    document.getElementById('form-cadastro').reset();
+    produtoPendente = null;
+}
+
+async function cadastrarComprador(event) {
+    event.preventDefault();
+    
+    const cpf = document.getElementById('cadastro-cpf').value.trim();
+    const pnome = document.getElementById('cadastro-pnome').value.trim();
+    const sobrenome = document.getElementById('cadastro-sobrenome').value.trim();
+    const cep = document.getElementById('cadastro-cep').value.trim();
+    const email = document.getElementById('cadastro-email').value.trim();
+    const senha = document.getElementById('cadastro-senha').value;
+
+    // Validações básicas
+    if (!cpf || cpf.length !== 11) {
+        mostrarMensagem('CPF deve ter 11 dígitos', 'error');
+        return;
+    }
+
+    if (!pnome || !sobrenome || !email || !senha) {
+        mostrarMensagem('Por favor, preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+
+    if (cep && cep.length !== 8) {
+        mostrarMensagem('CEP deve ter 8 dígitos', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/comprador/cadastrar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cpf, pnome, sobrenome, cep: cep || null, email, senha })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            mostrarMensagem('Cadastro realizado com sucesso!', 'success');
+            fecharModalCadastro();
+            
+            // Se havia um produto pendente, adiciona ao carrinho agora
+            if (produtoPendente) {
+                setTimeout(async () => {
+                    try {
+                        const carrinhoResponse = await fetch(`${API_URL}/comprador/carrinho`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                cpf, 
+                                id_produto: produtoPendente.idProduto, 
+                                quantidade: produtoPendente.quantidade 
+                            })
+                        });
+
+                        const carrinhoResult = await carrinhoResponse.json();
+                        if (carrinhoResponse.ok) {
+                            mostrarMensagem('Produto adicionado ao carrinho!', 'success');
+                        } else {
+                            mostrarMensagem(carrinhoResult.error || 'Erro ao adicionar produto ao carrinho', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Erro ao adicionar produto após cadastro:', error);
+                        mostrarMensagem('Erro ao adicionar produto ao carrinho', 'error');
+                    }
+                    produtoPendente = null;
+                }, 500);
+            }
+        } else {
+            mostrarMensagem(result.error || 'Erro ao cadastrar comprador', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao cadastrar comprador. Verifique sua conexão e tente novamente.', 'error');
+    }
+}
+
+// Fechar modal ao clicar fora dele
+window.onclick = function(event) {
+    const modal = document.getElementById('modal-cadastro');
+    if (event.target === modal) {
+        fecharModalCadastro();
     }
 }
 
@@ -258,6 +367,12 @@ async function visualizarCarrinho() {
                 ` : '<p style="margin-top: 1rem; color: #666;">Detalhes dos itens não disponíveis no momento.</p>'}
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #ddd;">
                     <input type="text" id="endereco-entrega" placeholder="Endereço de entrega" style="width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; box-sizing: border-box;">
+                    <select id="metodo-entrega" style="width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; box-sizing: border-box;">
+                        <option value="">Selecione o método de entrega</option>
+                        <option value="Correios">Correios</option>
+                        <option value="PAC">PAC</option>
+                        <option value="Motoboy">Motoboy</option>
+                    </select>
                     <select id="metodo-pagamento" style="width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; box-sizing: border-box;">
                         <option value="">Selecione o método de pagamento</option>
                         <option value="credito">Crédito</option>
@@ -311,10 +426,11 @@ async function removerDoCarrinho(idProduto) {
 
 async function finalizarPedido(cpf, dataPedido) {
     const endereco = document.getElementById('endereco-entrega').value.trim();
-    const metodo = document.getElementById('metodo-pagamento').value.trim();
+    const metodoEntrega = document.getElementById('metodo-entrega').value.trim();
+    const metodoPagamento = document.getElementById('metodo-pagamento').value.trim();
 
-    if (!endereco || !metodo) {
-        mostrarMensagem('Por favor, preencha endereço e método de pagamento', 'error');
+    if (!endereco || !metodoEntrega || !metodoPagamento) {
+        mostrarMensagem('Por favor, preencha endereço, método de entrega e método de pagamento', 'error');
         return;
     }
 
@@ -333,7 +449,8 @@ async function finalizarPedido(cpf, dataPedido) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 cpf: cpf, 
-                metodo_pagamento: metodo, 
+                metodo_pagamento: metodoPagamento, 
+                metodo_entrega: metodoEntrega,
                 endereco_entrega: endereco 
             })
         });
@@ -343,9 +460,11 @@ async function finalizarPedido(cpf, dataPedido) {
             mostrarMensagem('Pedido finalizado com sucesso!', 'success');
             // Limpar campos
             const enderecoInput = document.getElementById('endereco-entrega');
-            const metodoInput = document.getElementById('metodo-pagamento');
+            const metodoEntregaInput = document.getElementById('metodo-entrega');
+            const metodoPagamentoInput = document.getElementById('metodo-pagamento');
             if (enderecoInput) enderecoInput.value = '';
-            if (metodoInput) metodoInput.value = '';
+            if (metodoEntregaInput) metodoEntregaInput.value = '';
+            if (metodoPagamentoInput) metodoPagamentoInput.value = '';
             // Atualizar carrinho e lista de pedidos após um delay
             setTimeout(() => {
                 visualizarCarrinho();
@@ -392,7 +511,8 @@ async function visualizarPedidos() {
                 <p><strong>Total:</strong> R$ ${parseFloat(pedido.total_pedido || 0).toFixed(2)}</p>
                 <p><strong>Itens:</strong> ${pedido.total_produtos || 0}</p>
                 ${pedido.status_pagamento ? `<p><strong>Pagamento:</strong> ${pedido.status_pagamento} ${pedido.metodo_pagamento ? `(${pedido.metodo_pagamento})` : ''}</p>` : ''}
-                ${pedido.status_entrega ? `<p><strong>Entrega:</strong> ${pedido.status_entrega}</p>` : ''}
+                ${pedido.status_entrega ? `<p><strong>Entrega:</strong> ${pedido.status_entrega} ${pedido.metodo_entrega ? `(${pedido.metodo_entrega})` : ''}</p>` : ''}
+                ${pedido.endereco_entrega ? `<p><strong>Endereço:</strong> ${pedido.endereco_entrega}</p>` : ''}
                 ${pedido.status_pagamento === 'pendente' ? `
                     <button onclick="simularPagamento('${cpf}', '${dataPedidoFormatada}')" class="btn btn-success" style="margin-top: 0.5rem;">
                         Simular Pagamento
@@ -477,6 +597,50 @@ async function criarSolicitacao(cpf, dataPedido) {
     }
 }
 
+async function carregarProdutosComprados() {
+    const cpf = obterCPFComprador();
+    if (!cpf) {
+        const selectProduto = document.getElementById('avaliacao-produto');
+        selectProduto.innerHTML = '<option value="">Informe seu CPF primeiro</option>';
+        selectProduto.disabled = true;
+        return;
+    }
+
+    const selectProduto = document.getElementById('avaliacao-produto');
+    selectProduto.innerHTML = '<option value="">Carregando produtos...</option>';
+    selectProduto.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/comprador/produtos-comprados?cpf=${cpf}`);
+        
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status}`);
+        }
+        
+        const produtos = await response.json();
+        
+        if (!produtos || produtos.length === 0) {
+            selectProduto.innerHTML = '<option value="">Nenhum produto comprado encontrado</option>';
+            selectProduto.disabled = false;
+            return;
+        }
+
+        selectProduto.innerHTML = '<option value="">Selecione um produto que você comprou</option>';
+        produtos.forEach(produto => {
+            const option = document.createElement('option');
+            option.value = produto.id_produto;
+            option.textContent = `${produto.nome_produto} - R$ ${parseFloat(produto.preco || 0).toFixed(2)}`;
+            selectProduto.appendChild(option);
+        });
+        
+        selectProduto.disabled = false;
+    } catch (error) {
+        console.error('Erro:', error);
+        selectProduto.innerHTML = '<option value="">Erro ao carregar produtos</option>';
+        selectProduto.disabled = false;
+    }
+}
+
 async function avaliarProduto() {
     const cpf = obterCPFComprador();
     const idProduto = parseInt(document.getElementById('avaliacao-produto').value);
@@ -488,7 +652,7 @@ async function avaliarProduto() {
     }
 
     if (!idProduto || !nota) {
-        mostrarMensagem('Por favor, preencha todos os campos', 'error');
+        mostrarMensagem('Por favor, selecione um produto e informe a nota', 'error');
         return;
     }
 
@@ -507,6 +671,9 @@ async function avaliarProduto() {
         const result = await response.json();
         if (response.ok) {
             mostrarMensagem('Produto avaliado com sucesso!', 'success');
+            // Limpa os campos após avaliação
+            document.getElementById('avaliacao-nota').value = '';
+            document.getElementById('avaliacao-produto').value = '';
         } else {
             mostrarMensagem(result.error || 'Erro ao avaliar produto', 'error');
         }
@@ -537,6 +704,8 @@ async function carregarDadosVendedor() {
                     <p>${vendedor.desc_loja || 'Sem descrição'}</p>
                     <p><strong>CPF:</strong> ${vendedor.cpf}</p>
                     <p><strong>Email:</strong> ${vendedor.email}</p>
+                    <p><strong>CEP:</strong> ${vendedor.cep}</p>
+                    <p><strong>Nome:</strong> ${vendedor.pnome} ${vendedor.sobrenome}</p>
                 </div>
             `;
         } else {

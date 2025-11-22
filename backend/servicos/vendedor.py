@@ -99,9 +99,60 @@ class VendedorService:
         """
         return self.db.execute_select_all(query, (cpf_vendedor,))
 
+    def verificar_vendedor_existe(self, cpf: str):
+        """Verifica se o vendedor existe na tabela"""
+        query_vendedor = "SELECT cpf_vendedor FROM vendedor WHERE cpf_vendedor = %s"
+        vendedor = self.db.execute_select_one(query_vendedor, (cpf,))
+        return vendedor is not None
+
+    def criar_vendedor(self, cpf: str, nome_loja: str, desc_loja: str = ""):
+        """Cria um novo usuário e vendedor"""
+        # Verifica se já existe usuário
+        query_usuario = "SELECT cpf FROM usuario WHERE cpf = %s"
+        usuario = self.db.execute_select_one(query_usuario, (cpf,))
+        
+        if not usuario:
+            # Cria usuário com dados mínimos
+            email = f"vendedor_{cpf}@ecommerce.local"
+            senha_hash = "hash_padrao"  # Senha padrão para vendedores criados automaticamente
+            pnome = "Vendedor"
+            sobrenome = cpf[:4]  # Usa primeiros 4 dígitos do CPF como sobrenome
+            
+            insert_usuario = """
+                INSERT INTO usuario (cpf, pnome, sobrenome, cep, email, senha_hash)
+                VALUES (%s, %s, %s, NULL, %s, %s)
+            """
+            if not self.db.execute_statement(insert_usuario, (cpf, pnome, sobrenome, email, senha_hash)):
+                print(f"Erro ao criar usuário para CPF: {cpf}")
+                return False, "Erro ao criar usuário"
+        
+        # Verifica se já existe vendedor
+        if self.verificar_vendedor_existe(cpf):
+            return False, "Vendedor já existe com este CPF"
+        
+        # Cria vendedor
+        insert_vendedor = """
+            INSERT INTO vendedor (cpf_vendedor, nome_loja, desc_loja)
+            VALUES (%s, %s, %s)
+        """
+        if not self.db.execute_statement(insert_vendedor, (cpf, nome_loja, desc_loja or "")):
+            print(f"Erro ao criar vendedor para CPF: {cpf}")
+            return False, "Erro ao criar vendedor"
+        
+        return True, "Vendedor criado com sucesso"
+
     def adicionar_produto(self, cpf_vendedor: str, nome: str, descricao: str, 
                          preco: float, estoque: int, alerta_estoque: int, origem: str = ""):
         """Adiciona novo produto à loja"""
+        # Verifica se o vendedor existe, se não existir, cria automaticamente
+        if not self.verificar_vendedor_existe(cpf_vendedor):
+            # Cria vendedor com nome de loja padrão
+            nome_loja = f"Loja {cpf_vendedor[:4]}"
+            success, message = self.criar_vendedor(cpf_vendedor, nome_loja, f"Loja criada automaticamente para CPF {cpf_vendedor}")
+            if not success:
+                print(f"Erro ao criar vendedor automaticamente: {message}")
+                return False
+        
         # Insere produto
         insert_produto = """
             INSERT INTO produto (nome_produto, desc_produto, preco, estoque_atual, 
