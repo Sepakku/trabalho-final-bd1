@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SI Market - E-commerce</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>SI Market</h1>
+            <div class="nav-buttons">
+                <button onclick="showCompradorView()" class="btn btn-primary">Área do Comprador</button>
+                <button onclick="showVendedorView()" class="btn btn-secondary">Área do Vendedor</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Área do Comprador -->
+        <div id="comprador-view" class="view">
+            <h2>Área do Comprador</h2>
+            
+            <div class="section" style="background-color: #f0f0f0; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
+                <h3>Meu CPF</h3>
+                <input type="text" id="comprador-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;">
+                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">Todas as operações usarão este CPF</p>
+            </div>
+            
+            <div class="section">
+                <h3>Buscar Produtos</h3>
+                <div class="search-form">
+                    <input type="text" id="search-nome" placeholder="Nome do produto">
+                    <input type="text" id="search-origem" placeholder="Origem">
+                    <input type="text" id="search-loja" placeholder="Loja">
+                    <input type="number" id="search-preco-min" placeholder="Preço mínimo">
+                    <input type="number" id="search-preco-max" placeholder="Preço máximo">
+                    <button onclick="buscarProdutos()" class="btn btn-primary">Buscar</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Produtos Disponíveis</h3>
+                <div id="produtos-lista" class="produtos-grid"></div>
+            </div>
+
+            <div class="section">
+                <h3>Meu Carrinho</h3>
+                <div class="carrinho-info">
+                    <button onclick="visualizarCarrinho()" class="btn btn-primary">Ver Carrinho</button>
+                </div>
+                <div id="carrinho-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Meus Pedidos</h3>
+                <div class="pedidos-info">
+                    <button onclick="visualizarPedidos()" class="btn btn-primary">Ver Pedidos</button>
+                </div>
+                <div id="pedidos-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Avaliar Produto</h3>
+                <div class="avaliacao-form">
+                    <input type="number" id="avaliacao-produto" placeholder="ID do Produto">
+                    <input type="number" id="avaliacao-nota" placeholder="Nota (1-5)" min="1" max="5">
+                    <button onclick="avaliarProduto()" class="btn btn-primary">Avaliar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área do Vendedor -->
+        <div id="vendedor-view" class="view" style="display: none;">
+            <h2>Área do Vendedor</h2>
+            
+            <div class="section">
+                <h3>Informações do Vendedor</h3>
+                <input type="text" id="vendedor-cpf" placeholder="Seu CPF">
+                <button onclick="carregarDadosVendedor()" class="btn btn-primary">Carregar Dados</button>
+                <div id="vendedor-info"></div>
+            </div>
+
+            <div class="section">
+                <h3>Estatísticas</h3>
+                <div class="stats-controls">
+                    <input type="text" id="stats-cpf" placeholder="CPF do Vendedor">
+                    <select id="stats-periodo">
+                        <option value="1">1 mês</option>
+                        <option value="3">3 meses</option>
+                        <option value="6">6 meses</option>
+                        <option value="12">12 meses</option>
+                    </select>
+                    <button onclick="carregarEstatisticas()" class="btn btn-primary">Carregar</button>
+                </div>
+                <div id="estatisticas"></div>
+            </div>
+
+            <div class="section">
+                <h3>Meus Produtos</h3>
+                <div class="produtos-controls">
+                    <input type="text" id="produtos-vendedor-cpf" placeholder="CPF do Vendedor">
+                    <button onclick="carregarProdutosVendedor()" class="btn btn-primary">Carregar Produtos</button>
+                </div>
+                <div id="produtos-vendedor-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Adicionar Produto</h3>
+                <div class="produto-form">
+                    <input type="text" id="novo-produto-cpf" placeholder="CPF do Vendedor">
+                    <input type="text" id="novo-produto-nome" placeholder="Nome do Produto">
+                    <textarea id="novo-produto-desc" placeholder="Descrição"></textarea>
+                    <input type="number" id="novo-produto-preco" placeholder="Preço" step="0.01">
+                    <input type="number" id="novo-produto-estoque" placeholder="Estoque" value="0">
+                    <input type="number" id="novo-produto-alerta" placeholder="Alerta de Estoque" value="0">
+                    <input type="text" id="novo-produto-origem" placeholder="Origem">
+                    <button onclick="adicionarProduto()" class="btn btn-success">Adicionar Produto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

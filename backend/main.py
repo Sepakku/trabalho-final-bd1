@@ -1,8 +1,9 @@
-# Camada que geerencia o database
+# Camada que gerencia o database
 from flask import Flask, jsonify
 from flask_cors import CORS
 from backend.rotas.produto_comprador import produtos_comprador_blueprint
-from Trabalho_final_Backend.rotas.vendedor import vendedor_blueprint
+from backend.rotas.vendedor import vendedor_blueprint
+from backend.rotas.comprador import comprador_blueprint
 
 app = Flask(__name__)
 CORS(app, origins="*")
@@ -15,4 +16,7 @@ def get_autor():
 
 app.register_blueprint(produtos_comprador_blueprint)
 app.register_blueprint(vendedor_blueprint)
-app.run("0.0.0.0", port=8001, debug=False)
+app.register_blueprint(comprador_blueprint)
+
+if __name__ == "__main__":
+    app.run("0.0.0.0", port=8001, debug=True)

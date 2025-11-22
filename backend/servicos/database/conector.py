@@ -8,9 +8,9 @@ class DatabaseManager:
 
     def __init__(self) -> None:
         self.conn = psycopg2.connect(
-            dbname="SIMarket",  # colocar o nome do seu database
+            dbname="SI-Market",  # colocar o nome do seu database
             user="postgres",
-            password="****",  # colocar sua senha
+            password="postgres",  # colocar sua senha
             host="127.0.0.1",
             port=5432,
         )
@@ -21,8 +21,9 @@ class DatabaseManager:
         try:
             self.cursor.execute(statement, params)
             self.conn.commit()
-        except:
-            self.conn.reset()
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Erro ao executar statement: {e}")
             return False
         return True
 
@@ -40,3 +41,15 @@ class DatabaseManager:
             return None
 
         return dict(query_result)
+    
+    def execute_statement_returning(self, statement: str, params=None):
+        """Usado para INSERT/UPDATE com RETURNING"""
+        try:
+            self.cursor.execute(statement, params)
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            return result[0] if result else None
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Erro ao executar statement com RETURNING: {e}")
+            return None

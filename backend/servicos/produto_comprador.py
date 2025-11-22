@@ -27,24 +27,39 @@ class ProdutoCompradorDatabase:
                 """
 
         where_clauses = []
+        params = []
 
         if nome:
-            where_clauses.append(f"p.nome_produto LIKE '%{nome}%'")
+            where_clauses.append("p.nome_produto ILIKE %s")
+            params.append(f"%{nome}%")
 
         if origem:
-            where_clauses.append(f"p.origem = '{origem}'")
+            where_clauses.append("LOWER(p.origem) = LOWER(%s)")
+            params.append(origem)
 
         if loja:
-            where_clauses.append(f"v.nome_loja = '{loja}'")
+            where_clauses.append("LOWER(v.nome_loja) = LOWER(%s)")
+            params.append(loja)
 
         if categoria:
-            where_clauses.append(f"cat.nome_categoria = '{categoria}'")
+            where_clauses.append("LOWER(cat.nome_categoria) = LOWER(%s)")
+            params.append(categoria)
 
         if min_p:
-            where_clauses.append(f"p.preco >= {min_p}")
+            try:
+                min_preco = float(min_p)
+                where_clauses.append("p.preco >= %s")
+                params.append(min_preco)
+            except ValueError:
+                pass
 
         if max_p:
-            where_clauses.append(f"p.preco <= {max_p}")
+            try:
+                max_preco = float(max_p)
+                where_clauses.append("p.preco <= %s")
+                params.append(max_preco)
+            except ValueError:
+                pass
 
         if where_clauses:
             query += "WHERE " + " AND ".join(where_clauses) + "\n"
@@ -62,6 +77,11 @@ class ProdutoCompradorDatabase:
                 """
 
         if bem_avaliado:
-            query += f"\nHAVING AVG(a.nota) >= {bem_avaliado}"
+            try:
+                nota_min = float(bem_avaliado)
+                query += "\nHAVING AVG(a.nota) >= %s"
+                params.append(nota_min)
+            except ValueError:
+                pass
 
-        return self.db.execute_select_all(query)
+        return self.db.execute_select_all(query, tuple(params) if params else None)
