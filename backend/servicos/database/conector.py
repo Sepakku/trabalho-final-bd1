@@ -16,7 +16,7 @@ class DatabaseManager:
         )
         self.cursor = self.conn.cursor(cursor_factory=DictCursor)
 
-        def execute_statement(self, statement: str, params=None) -> bool:
+    def execute_statement(self, statement: str, params=None) -> bool:
         """Usado para Inserções, Deleções, Alter Tables"""
         try:
             with self.conn.cursor() as cursor:
