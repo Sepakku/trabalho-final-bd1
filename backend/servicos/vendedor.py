@@ -290,3 +290,116 @@ class VendedorService:
             WHERE id_produto = %s
         """
         return self.db.execute_statement(update, tuple(valores))
+
+    def get_solicitacoes(self, cpf_vendedor: str):
+        """Retorna todas as solicitações relacionadas aos produtos do vendedor"""
+        query = """
+            SELECT DISTINCT
+                s.cpf_cliente,
+                s.data_pedido,
+                s.data_solicitacao,
+                s.tipo,
+                s.status_solicitacao,
+                p.total_pedido,
+                p.status_pedido,
+                u.pnome || ' ' || u.sobrenome as nome_cliente
+            FROM solicitacao s
+            JOIN pedido p ON p.cpf_cliente = s.cpf_cliente 
+                AND p.data_pedido = s.data_pedido
+            JOIN contemprod cp ON cp.cpf_cliente = s.cpf_cliente 
+                AND cp.data_pedido = s.data_pedido
+            JOIN vendeprod vp ON vp.id_produto = cp.id_produto
+            JOIN usuario u ON u.cpf = s.cpf_cliente
+            WHERE vp.cpf_vendedor = %s
+            ORDER BY s.data_solicitacao DESC
+        """
+        return self.db.execute_select_all(query, (cpf_vendedor,))
+
+    def atualizar_status_solicitacao(self, cpf_vendedor: str, cpf_cliente: str, 
+                                     data_pedido: str, data_solicitacao: str, 
+                                     novo_status: str):
+        """Atualiza o status de uma solicitação (aceitar/recusar)"""
+        # Converte datas primeiro para usar na verificação
+        # Converte data_solicitacao para datetime
+        data_solicitacao_dt = None
+        data_solicitacao_clean = data_solicitacao.strip()
+        
+        formatos = [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%dT%H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S%z',
+            '%Y-%m-%dT%H:%M:%S.%f%z',
+            '%Y-%m-%d %H:%M:%S.%f',
+        ]
+        
+        for formato in formatos:
+            try:
+                data_solicitacao_dt = datetime.strptime(data_solicitacao_clean, formato)
+                break
+            except ValueError:
+                continue
+        
+        if data_solicitacao_dt is None:
+            try:
+                data_solicitacao_clean = data_solicitacao_clean.replace('Z', '+00:00')
+                data_solicitacao_dt = datetime.fromisoformat(data_solicitacao_clean)
+            except:
+                print(f"Erro ao converter data_solicitacao: {data_solicitacao}")
+                return False
+        
+        # Converte data_pedido para datetime
+        data_pedido_dt = None
+        data_pedido_clean = data_pedido.strip()
+        
+        for formato in formatos:
+            try:
+                data_pedido_dt = datetime.strptime(data_pedido_clean, formato)
+                break
+            except ValueError:
+                continue
+        
+        if data_pedido_dt is None:
+            try:
+                data_pedido_clean = data_pedido_clean.replace('Z', '+00:00')
+                data_pedido_dt = datetime.fromisoformat(data_pedido_clean)
+            except:
+                print(f"Erro ao converter data_pedido: {data_pedido}")
+                return False
+        
+        # Verifica se a solicitação está relacionada ao vendedor usando intervalo
+        query_verifica = """
+            SELECT 1
+            FROM solicitacao s
+            JOIN pedido p ON p.cpf_cliente = s.cpf_cliente 
+                AND p.data_pedido >= %s - INTERVAL '1 second'
+                AND p.data_pedido <= %s + INTERVAL '1 second'
+            JOIN contemprod cp ON cp.cpf_cliente = s.cpf_cliente 
+                AND cp.data_pedido >= %s - INTERVAL '1 second'
+                AND cp.data_pedido <= %s + INTERVAL '1 second'
+            JOIN vendeprod vp ON vp.id_produto = cp.id_produto
+            WHERE vp.cpf_vendedor = %s
+                AND s.cpf_cliente = %s
+                AND s.data_solicitacao >= %s - INTERVAL '1 second'
+                AND s.data_solicitacao <= %s + INTERVAL '1 second'
+            LIMIT 1
+        """
+        
+        if not self.db.execute_select_one(query_verifica, (data_pedido_dt, data_pedido_dt, data_pedido_dt, data_pedido_dt, cpf_vendedor, cpf_cliente, data_solicitacao_dt, data_solicitacao_dt)):
+            return False
+        
+        # Valida o novo status
+        if novo_status not in ['em_analise', 'concluida']:
+            return False
+        
+        # Atualiza o status usando intervalo
+        update = """
+            UPDATE solicitacao
+            SET status_solicitacao = %s
+            WHERE cpf_cliente = %s
+                AND data_pedido >= %s - INTERVAL '1 second'
+                AND data_pedido <= %s + INTERVAL '1 second'
+                AND data_solicitacao >= %s - INTERVAL '1 second'
+                AND data_solicitacao <= %s + INTERVAL '1 second'
+        """
+        return self.db.execute_statement(update, (novo_status, cpf_cliente, data_pedido_dt, data_pedido_dt, data_solicitacao_dt, data_solicitacao_dt))

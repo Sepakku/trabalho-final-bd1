@@ -160,3 +160,40 @@ def get_produtos_melhor_avaliacao():
     
     produtos = VendedorService().get_produtos_melhor_avaliacao(cpf)
     return jsonify(produtos), 200
+
+
+@vendedor_blueprint.route("/vendedor/solicitacoes", methods=["GET"])
+def get_solicitacoes():
+    """Retorna todas as solicitações relacionadas ao vendedor"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    solicitacoes = VendedorService().get_solicitacoes(cpf)
+    return jsonify(solicitacoes), 200
+
+
+@vendedor_blueprint.route("/vendedor/solicitacoes", methods=["PATCH"])
+def atualizar_status_solicitacao():
+    """Atualiza o status de uma solicitação (aceitar/recusar)"""
+    json_data = request.get_json()
+    cpf_vendedor = json_data.get("cpf_vendedor")
+    cpf_cliente = json_data.get("cpf_cliente")
+    data_pedido = json_data.get("data_pedido")
+    data_solicitacao = json_data.get("data_solicitacao")
+    novo_status = json_data.get("status")  # 'em_analise' ou 'concluida'
+    
+    if not all([cpf_vendedor, cpf_cliente, data_pedido, data_solicitacao, novo_status]):
+        return jsonify({"error": "Todos os campos são obrigatórios"}), 400
+    
+    if novo_status not in ['em_analise', 'concluida']:
+        return jsonify({"error": "Status inválido. Use 'em_analise' ou 'concluida'"}), 400
+    
+    result = VendedorService().atualizar_status_solicitacao(
+        cpf_vendedor, cpf_cliente, data_pedido, data_solicitacao, novo_status
+    )
+    
+    if result:
+        status_texto = "aceita" if novo_status == 'concluida' else "em análise"
+        return jsonify({"message": f"Solicitação {status_texto} com sucesso"}), 200
+    return jsonify({"error": "Erro ao atualizar solicitação. Verifique se a solicitação pertence a este vendedor."}), 400

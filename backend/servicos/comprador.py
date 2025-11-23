@@ -191,7 +191,10 @@ class CompradorService:
                 pg.metodo_pagamento,
                 e.status_entrega,
                 e.metodo_entrega,
-                e.endereco_entrega
+                e.endereco_entrega,
+                e.data_envio,
+                e.data_prevista,
+                e.frete
             FROM pedido p
             LEFT JOIN pagamento pg ON pg.fk_cpf_cliente = p.cpf_cliente 
                 AND pg.fk_data_pedido = p.data_pedido
@@ -260,7 +263,8 @@ class CompradorService:
                 e.metodo_entrega,
                 e.endereco_entrega,
                 e.data_envio,
-                e.data_prevista
+                e.data_prevista,
+                e.frete
             FROM pedido p
             LEFT JOIN pagamento pg ON pg.fk_cpf_cliente = p.cpf_cliente 
                 AND pg.fk_data_pedido = p.data_pedido
@@ -291,7 +295,8 @@ class CompradorService:
                     e.metodo_entrega,
                     e.endereco_entrega,
                     e.data_envio,
-                    e.data_prevista
+                    e.data_prevista,
+                    e.frete
                 FROM pedido p
                 LEFT JOIN pagamento pg ON pg.fk_cpf_cliente = p.cpf_cliente 
                     AND pg.fk_data_pedido = p.data_pedido
@@ -600,18 +605,51 @@ class CompradorService:
 
     def criar_solicitacao(self, cpf: str, data_pedido: str, tipo: str):
         """Cria solicitação sobre um pedido"""
+        # Converte data_pedido para datetime usando múltiplos formatos
+        data_pedido_dt = None
+        data_pedido_clean = data_pedido.strip()
+        
+        formatos = [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%dT%H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S%z',
+            '%Y-%m-%dT%H:%M:%S.%f%z',
+            '%Y-%m-%d %H:%M:%S.%f',
+        ]
+        
         try:
-            # Tenta vários formatos
-            data_pedido = data_pedido.replace('Z', '+00:00')
-            if 'T' in data_pedido:
-                data_pedido_dt = datetime.fromisoformat(data_pedido)
-            else:
-                # Formato apenas data/hora sem timezone
-                data_pedido_dt = datetime.strptime(data_pedido, '%Y-%m-%d %H:%M:%S')
+            for formato in formatos:
+                try:
+                    data_pedido_dt = datetime.strptime(data_pedido_clean, formato)
+                    break
+                except ValueError:
+                    continue
+            
+            if data_pedido_dt is None:
+                data_pedido_clean = data_pedido_clean.replace('Z', '+00:00')
+                data_pedido_dt = datetime.fromisoformat(data_pedido_clean)
         except Exception as e:
-            print(f"Erro ao converter data: {e}")
+            print(f"Erro ao converter data_pedido: {e}")
             return False
         
+        # Busca o pedido usando intervalo para obter a data exata do banco
+        query_pedido = """
+            SELECT cpf_cliente, data_pedido
+            FROM pedido
+            WHERE cpf_cliente = %s
+                AND data_pedido >= %s - INTERVAL '1 second'
+                AND data_pedido <= %s + INTERVAL '1 second'
+            LIMIT 1
+        """
+        pedido = self.db.execute_select_one(query_pedido, (cpf, data_pedido_dt, data_pedido_dt))
+        
+        if not pedido:
+            print(f"Pedido não encontrado para CPF {cpf} e data {data_pedido_dt}")
+            return False
+        
+        # Usa a data exata do pedido encontrado no banco
+        data_pedido_exata = pedido['data_pedido']
         data_solicitacao = datetime.now(ZoneInfo("America/Sao_Paulo"))
         status_solicitacao = 'aberta'
         
@@ -620,7 +658,7 @@ class CompradorService:
             VALUES (%s, %s, %s, %s, %s)
         """
         return self.db.execute_statement(query, (
-            cpf, data_pedido_dt, data_solicitacao, tipo, status_solicitacao
+            cpf, data_pedido_exata, data_solicitacao, tipo, status_solicitacao
         ))
 
     def get_produtos_comprados(self, cpf: str):

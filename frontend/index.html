@@ -81,9 +81,14 @@
         <div id="vendedor-view" class="view" style="display: none;">
             <h2>Área do Vendedor</h2>
             
+            <div class="section" style="background-color: #f0f0f0; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
+                <h3>Meu CPF</h3>
+                <input type="text" id="vendedor-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;">
+                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">Todas as operações usarão este CPF</p>
+            </div>
+            
             <div class="section">
                 <h3>Informações do Vendedor</h3>
-                <input type="text" id="vendedor-cpf" placeholder="Seu CPF">
                 <button onclick="carregarDadosVendedor()" class="btn btn-primary">Carregar Dados</button>
                 <div id="vendedor-info"></div>
             </div>
@@ -91,14 +96,13 @@
             <div class="section">
                 <h3>Estatísticas</h3>
                 <div class="stats-controls">
-                    <input type="text" id="stats-cpf" placeholder="CPF do Vendedor">
                     <select id="stats-periodo">
                         <option value="1">1 mês</option>
                         <option value="3">3 meses</option>
                         <option value="6">6 meses</option>
                         <option value="12">12 meses</option>
                     </select>
-                    <button onclick="carregarEstatisticas()" class="btn btn-primary">Carregar</button>
+                    <button onclick="carregarEstatisticas()" class="btn btn-primary">Carregar Estatísticas</button>
                 </div>
                 <div id="estatisticas"></div>
             </div>
@@ -106,19 +110,22 @@
             <div class="section">
                 <h3>Meus Produtos</h3>
                 <div class="produtos-controls">
-                    <input type="text" id="produtos-vendedor-cpf" placeholder="CPF do Vendedor">
                     <button onclick="carregarProdutosVendedor()" class="btn btn-primary">Carregar Produtos</button>
                 </div>
                 <div id="produtos-vendedor-lista"></div>
             </div>
 
             <div class="section">
+                <h3>Solicitações</h3>
+                <div class="solicitacoes-controls">
+                    <button onclick="carregarSolicitacoes()" class="btn btn-primary">Carregar Solicitações</button>
+                </div>
+                <div id="solicitacoes-lista"></div>
+            </div>
+
+            <div class="section">
                 <h3>Adicionar Produto</h3>
                 <div class="produto-form">
-                    <div class="form-group">
-                        <label for="novo-produto-cpf">CPF do Vendedor *</label>
-                        <input type="text" id="novo-produto-cpf" placeholder="Ex: 12345678901" maxlength="11" required>
-                    </div>
                     <div class="form-group">
                         <label for="novo-produto-nome">Nome do Produto *</label>
                         <input type="text" id="novo-produto-nome" placeholder="Ex: Notebook Gamer" required>
@@ -150,6 +157,15 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes da Entrega -->
+    <div id="modal-entrega" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharModalEntrega()">&times;</span>
+            <h2>Detalhes da Entrega</h2>
+            <div id="detalhes-entrega-conteudo"></div>
         </div>
     </div>
 

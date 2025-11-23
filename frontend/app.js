@@ -18,6 +18,11 @@ function obterCPFComprador() {
     return document.getElementById('comprador-cpf-principal').value.trim();
 }
 
+// Função auxiliar para obter o CPF do vendedor
+function obterCPFVendedor() {
+    return document.getElementById('vendedor-cpf-principal').value.trim();
+}
+
 // Função auxiliar para formatar data para o backend
 function formatarDataParaBackend(data) {
     if (!data) {
@@ -304,10 +309,78 @@ async function cadastrarComprador(event) {
 
 // Fechar modal ao clicar fora dele
 window.onclick = function(event) {
-    const modal = document.getElementById('modal-cadastro');
-    if (event.target === modal) {
+    const modalCadastro = document.getElementById('modal-cadastro');
+    const modalEntrega = document.getElementById('modal-entrega');
+    if (event.target === modalCadastro) {
         fecharModalCadastro();
     }
+    if (event.target === modalEntrega) {
+        fecharModalEntrega();
+    }
+}
+
+async function verDetalhesEntrega(cpf, dataPedido) {
+    if (!cpf) {
+        cpf = obterCPFComprador();
+        if (!cpf) {
+            mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/comprador/pedido?cpf=${cpf}&data_pedido=${encodeURIComponent(dataPedido)}`);
+        
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status} ao buscar detalhes do pedido`);
+        }
+        
+        const pedido = await response.json();
+        
+        if (!pedido) {
+            mostrarMensagem('Pedido não encontrado', 'error');
+            return;
+        }
+
+        // Formata as datas
+        const formatarData = (data) => {
+            if (!data) return 'Não informado';
+            try {
+                return new Date(data).toLocaleString('pt-BR');
+            } catch (e) {
+                return data;
+            }
+        };
+
+        const conteudo = `
+            <div style="margin-top: 1.5rem;">
+                <div style="margin-bottom: 1rem; padding: 1rem; background-color: #f9fafb; border-radius: 8px;">
+                    <h3 style="color: #667eea; margin-bottom: 1rem;">Informações da Entrega</h3>
+                    <p><strong>Status:</strong> <span class="status ${pedido.status_entrega || ''}">${pedido.status_entrega || 'Não informado'}</span></p>
+                    <p><strong>Método de Entrega:</strong> ${pedido.metodo_entrega || 'Não informado'}</p>
+                    <p><strong>Endereço:</strong> ${pedido.endereco_entrega || 'Não informado'}</p>
+                    <p><strong>Frete:</strong> R$ ${parseFloat(pedido.frete || 0).toFixed(2)}</p>
+                </div>
+                <div style="margin-bottom: 1rem; padding: 1rem; background-color: #f9fafb; border-radius: 8px;">
+                    <h3 style="color: #667eea; margin-bottom: 1rem;">Datas</h3>
+                    <p><strong>Data de Envio:</strong> ${formatarData(pedido.data_envio)}</p>
+                    <p><strong>Data Prevista:</strong> ${formatarData(pedido.data_prevista)}</p>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('detalhes-entrega-conteudo').innerHTML = conteudo;
+        document.getElementById('modal-entrega').style.display = 'block';
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao carregar detalhes da entrega', 'error');
+    }
+}
+
+function fecharModalEntrega() {
+    const modal = document.getElementById('modal-entrega');
+    modal.style.display = 'none';
+    document.getElementById('detalhes-entrega-conteudo').innerHTML = '';
 }
 
 async function visualizarCarrinho() {
@@ -541,6 +614,11 @@ async function visualizarPedidos() {
                         Simular Pagamento
                     </button>
                 ` : ''}
+                ${pedido.status_entrega ? `
+                    <button onclick="verDetalhesEntrega('${cpf}', '${dataPedidoFormatada}')" class="btn btn-primary" style="margin-top: 0.5rem;">
+                        Ver Detalhes da Entrega
+                    </button>
+                ` : ''}
                 <button onclick="criarSolicitacao('${cpf}', '${dataPedidoFormatada}')" class="btn btn-secondary" style="margin-top: 0.5rem;">
                     Criar Solicitação
                 </button>
@@ -709,9 +787,9 @@ async function avaliarProduto() {
 // ========== FUNCIONALIDADES DO VENDEDOR ==========
 
 async function carregarDadosVendedor() {
-    const cpf = document.getElementById('vendedor-cpf').value;
+    const cpf = obterCPFVendedor();
     if (!cpf) {
-        mostrarMensagem('Por favor, informe o CPF', 'error');
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
         return;
     }
 
@@ -741,11 +819,11 @@ async function carregarDadosVendedor() {
 }
 
 async function carregarEstatisticas() {
-    const cpf = document.getElementById('stats-cpf').value;
+    const cpf = obterCPFVendedor();
     const meses = parseInt(document.getElementById('stats-periodo').value);
     
     if (!cpf) {
-        mostrarMensagem('Por favor, informe o CPF', 'error');
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
         return;
     }
 
@@ -814,9 +892,9 @@ async function carregarEstatisticas() {
 }
 
 async function carregarProdutosVendedor() {
-    const cpf = document.getElementById('produtos-vendedor-cpf').value;
+    const cpf = obterCPFVendedor();
     if (!cpf) {
-        mostrarMensagem('Por favor, informe o CPF', 'error');
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
         return;
     }
 
@@ -841,8 +919,8 @@ async function carregarProdutosVendedor() {
                 </div>
                 <div class="actions">
                     <input type="number" id="estoque-${produto.id_produto}" placeholder="Novo estoque" min="0">
-                    <button onclick="atualizarEstoque('${cpf}', ${produto.id_produto})" class="btn btn-primary">Atualizar Estoque</button>
-                    <button onclick="removerProduto('${cpf}', ${produto.id_produto})" class="btn btn-danger">Remover</button>
+                    <button onclick="atualizarEstoque(${produto.id_produto})" class="btn btn-primary">Atualizar Estoque</button>
+                    <button onclick="removerProduto(${produto.id_produto})" class="btn btn-danger">Remover</button>
                 </div>
             </div>
         `).join('');
@@ -852,7 +930,13 @@ async function carregarProdutosVendedor() {
     }
 }
 
-async function atualizarEstoque(cpf, idProduto) {
+async function atualizarEstoque(idProduto) {
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+        return;
+    }
+
     const novaQuantidade = parseInt(document.getElementById(`estoque-${idProduto}`).value);
     
     if (isNaN(novaQuantidade) || novaQuantidade < 0) {
@@ -880,7 +964,13 @@ async function atualizarEstoque(cpf, idProduto) {
     }
 }
 
-async function removerProduto(cpf, idProduto) {
+async function removerProduto(idProduto) {
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+        return;
+    }
+
     if (!confirm('Tem certeza que deseja remover este produto?')) return;
 
     try {
@@ -901,8 +991,148 @@ async function removerProduto(cpf, idProduto) {
     }
 }
 
+async function carregarSolicitacoes() {
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+        return;
+    }
+
+    const container = document.getElementById('solicitacoes-lista');
+    container.innerHTML = '<p>Carregando solicitações...</p>';
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/solicitacoes?cpf=${cpf}`);
+        const solicitacoes = await response.json();
+        
+        if (!solicitacoes || solicitacoes.length === 0) {
+            container.innerHTML = '<p>Nenhuma solicitação encontrada.</p>';
+            return;
+        }
+
+        container.innerHTML = solicitacoes.map(solicitacao => {
+            const dataPedidoFormatada = formatarDataParaBackend(solicitacao.data_pedido) || solicitacao.data_pedido;
+            const dataSolicitacaoFormatada = formatarDataParaBackend(solicitacao.data_solicitacao) || solicitacao.data_solicitacao;
+            
+            // Mapear tipos para português
+            const tipos = {
+                'devolucao': 'Devolução',
+                'troca': 'Troca',
+                'suporte': 'Suporte',
+                'cancelamento': 'Cancelamento'
+            };
+            
+            // Mapear status para português
+            const status = {
+                'aberta': 'Aberta',
+                'em_analise': 'Em Análise',
+                'concluida': 'Concluída'
+            };
+            
+            const tipoTexto = tipos[solicitacao.tipo] || solicitacao.tipo;
+            const statusTexto = status[solicitacao.status_solicitacao] || solicitacao.status_solicitacao;
+            
+            // Botões apenas para solicitações abertas
+            const botoes = solicitacao.status_solicitacao === 'aberta' ? `
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button onclick="aceitarSolicitacao('${cpf}', '${solicitacao.cpf_cliente}', '${dataPedidoFormatada}', '${dataSolicitacaoFormatada}')" 
+                            class="btn btn-success" style="flex: 1;">
+                        Aceitar
+                    </button>
+                    <button onclick="recusarSolicitacao('${cpf}', '${solicitacao.cpf_cliente}', '${dataPedidoFormatada}', '${dataSolicitacaoFormatada}')" 
+                            class="btn btn-danger" style="flex: 1;">
+                        Recusar
+                    </button>
+                </div>
+            ` : '';
+            
+            return `
+                <div class="pedido-item" style="margin-bottom: 1rem;">
+                    <h4>Solicitação de ${tipoTexto}</h4>
+                    <p><strong>Cliente:</strong> ${solicitacao.nome_cliente || solicitacao.cpf_cliente}</p>
+                    <p><strong>Status:</strong> <span class="status ${solicitacao.status_solicitacao}">${statusTexto}</span></p>
+                    <p><strong>Pedido:</strong> ${new Date(solicitacao.data_pedido).toLocaleString('pt-BR')}</p>
+                    <p><strong>Data da Solicitação:</strong> ${new Date(solicitacao.data_solicitacao).toLocaleString('pt-BR')}</p>
+                    <p><strong>Valor do Pedido:</strong> R$ ${parseFloat(solicitacao.total_pedido || 0).toFixed(2)}</p>
+                    ${botoes}
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Erro:', error);
+        container.innerHTML = '<p style="color: #ef4444;">Erro ao carregar solicitações</p>';
+        mostrarMensagem('Erro ao carregar solicitações', 'error');
+    }
+}
+
+async function aceitarSolicitacao(cpfVendedor, cpfCliente, dataPedido, dataSolicitacao) {
+    if (!confirm('Deseja aceitar esta solicitação? O status será alterado para "em análise".')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/solicitacoes`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cpf_vendedor: cpfVendedor,
+                cpf_cliente: cpfCliente,
+                data_pedido: dataPedido,
+                data_solicitacao: dataSolicitacao,
+                status: 'em_analise'
+            })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            mostrarMensagem('Solicitação aceita! Status atualizado para "em análise".', 'success');
+            setTimeout(() => {
+                carregarSolicitacoes();
+            }, 500);
+        } else {
+            mostrarMensagem(result.error || 'Erro ao aceitar solicitação', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao aceitar solicitação', 'error');
+    }
+}
+
+async function recusarSolicitacao(cpfVendedor, cpfCliente, dataPedido, dataSolicitacao) {
+    if (!confirm('Deseja recusar esta solicitação? O status será alterado para "concluída" (recusada).')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/solicitacoes`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cpf_vendedor: cpfVendedor,
+                cpf_cliente: cpfCliente,
+                data_pedido: dataPedido,
+                data_solicitacao: dataSolicitacao,
+                status: 'concluida'
+            })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            mostrarMensagem('Solicitação recusada! Status atualizado para "concluída".', 'success');
+            setTimeout(() => {
+                carregarSolicitacoes();
+            }, 500);
+        } else {
+            mostrarMensagem(result.error || 'Erro ao recusar solicitação', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao recusar solicitação', 'error');
+    }
+}
+
 async function adicionarProduto() {
-    const cpf = document.getElementById('novo-produto-cpf').value;
+    const cpf = obterCPFVendedor();
     const nome = document.getElementById('novo-produto-nome').value;
     const descricao = document.getElementById('novo-produto-desc').value;
     const preco = parseFloat(document.getElementById('novo-produto-preco').value);
@@ -910,8 +1140,13 @@ async function adicionarProduto() {
     const alerta = parseInt(document.getElementById('novo-produto-alerta').value) || 0;
     const origem = document.getElementById('novo-produto-origem').value;
 
-    if (!cpf || !nome || isNaN(preco)) {
-        mostrarMensagem('Por favor, preencha CPF, nome e preço', 'error');
+    if (!cpf) {
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+        return;
+    }
+
+    if (!nome || isNaN(preco)) {
+        mostrarMensagem('Por favor, preencha nome e preço', 'error');
         return;
     }
 
