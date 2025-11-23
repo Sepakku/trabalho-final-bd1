@@ -14,3 +14,10 @@ def getprodutos_comprador():
     preco_max = request.args.get("preco_max", "")
     bem_avaliado = request.args.get("bem_avaliado", "")
     return jsonify(ProdutoCompradorDatabase().get_produto_comprador(nome, origem, loja, categoria, preco_min, preco_max, bem_avaliado)), 200
+
+
+@produtos_comprador_blueprint.route("/categorias", methods=["GET"])
+def get_categorias():
+    """Retorna todas as categorias disponíveis"""
+    categorias = ProdutoCompradorDatabase().get_categorias()
+    return jsonify(categorias), 200

@@ -85,3 +85,12 @@ class ProdutoCompradorDatabase:
                 pass
 
         return self.db.execute_select_all(query, tuple(params) if params else None)
+
+    def get_categorias(self):
+        """Retorna todas as categorias disponíveis"""
+        query = """
+            SELECT DISTINCT id_categoria, nome_categoria
+            FROM categoria
+            ORDER BY nome_categoria
+        """
+        return self.db.execute_select_all(query)

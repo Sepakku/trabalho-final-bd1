@@ -32,6 +32,9 @@
                 <h3>Buscar Produtos</h3>
                 <div class="search-form">
                     <input type="text" id="search-nome" placeholder="Nome do produto">
+                    <select id="search-categoria">
+                        <option value="">Todas as categorias</option>
+                    </select>
                     <input type="text" id="search-origem" placeholder="Origem">
                     <input type="text" id="search-loja" placeholder="Loja">
                     <input type="number" id="search-preco-min" placeholder="Preço mínimo">
@@ -112,14 +115,39 @@
             <div class="section">
                 <h3>Adicionar Produto</h3>
                 <div class="produto-form">
-                    <input type="text" id="novo-produto-cpf" placeholder="CPF do Vendedor">
-                    <input type="text" id="novo-produto-nome" placeholder="Nome do Produto">
-                    <textarea id="novo-produto-desc" placeholder="Descrição"></textarea>
-                    <input type="number" id="novo-produto-preco" placeholder="Preço" step="0.01">
-                    <input type="number" id="novo-produto-estoque" placeholder="Estoque" value="0">
-                    <input type="number" id="novo-produto-alerta" placeholder="Alerta de Estoque" value="0">
-                    <input type="text" id="novo-produto-origem" placeholder="Origem">
-                    <button onclick="adicionarProduto()" class="btn btn-success">Adicionar Produto</button>
+                    <div class="form-group">
+                        <label for="novo-produto-cpf">CPF do Vendedor *</label>
+                        <input type="text" id="novo-produto-cpf" placeholder="Ex: 12345678901" maxlength="11" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-nome">Nome do Produto *</label>
+                        <input type="text" id="novo-produto-nome" placeholder="Ex: Notebook Gamer" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-desc">Descrição</label>
+                        <textarea id="novo-produto-desc" placeholder="Descreva o produto..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-preco">Preço (R$) *</label>
+                        <input type="number" id="novo-produto-preco" placeholder="Ex: 999.99" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="form-group estoque-group">
+                        <label for="novo-produto-estoque">📦 Quantidade em Estoque</label>
+                        <input type="number" id="novo-produto-estoque" placeholder="Ex: 50" value="0" min="0">
+                        <small class="form-help">Quantidade atual disponível para venda</small>
+                    </div>
+                    <div class="form-group alerta-group">
+                        <label for="novo-produto-alerta">⚠️ Limite de Alerta de Estoque</label>
+                        <input type="number" id="novo-produto-alerta" placeholder="Ex: 10" value="0" min="0">
+                        <small class="form-help">Quantidade mínima antes de alertar sobre estoque baixo</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-origem">Origem</label>
+                        <input type="text" id="novo-produto-origem" placeholder="Ex: Nacional, Importado">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <button onclick="adicionarProduto()" class="btn btn-success" style="width: 100%;">Adicionar Produto</button>
+                    </div>
                 </div>
             </div>
         </div>

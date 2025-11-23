@@ -140,6 +140,95 @@ input:focus, textarea:focus, select:focus {
     border-color: #667eea;
 }
 
+/* Form Group Styles */
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.form-group label::after {
+    content: '';
+}
+
+.form-group small.form-help {
+    color: #6b7280;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    margin: 0;
+}
+
+/* Estoque fields styling */
+.estoque-group {
+    background-color: #f0fdf4;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 2px solid #10b981;
+}
+
+.alerta-group {
+    background-color: #fffbeb;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 2px solid #f59e0b;
+}
+
+#novo-produto-estoque {
+    border-left: 4px solid #10b981;
+    background-color: white;
+}
+
+#novo-produto-alerta {
+    border-left: 4px solid #f59e0b;
+    background-color: white;
+}
+
+#novo-produto-estoque:focus {
+    border-color: #10b981;
+    border-left-width: 4px;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+#novo-produto-alerta:focus {
+    border-color: #f59e0b;
+    border-left-width: 4px;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.estoque-group label {
+    color: #065f46;
+    font-weight: 700;
+}
+
+.alerta-group label {
+    color: #92400e;
+    font-weight: 700;
+}
+
+/* Required field indicator */
+.form-group label:has(+ input[required]),
+.form-group label:has(+ textarea[required]) {
+    position: relative;
+}
+
+.form-group label:has(+ input[required])::after,
+.form-group label:has(+ textarea[required])::after {
+    content: ' *';
+    color: #ef4444;
+}
+
 .search-form, .carrinho-info, .pedidos-info, .avaliacao-form,
 .stats-controls, .produtos-controls, .produto-form {
     display: grid;

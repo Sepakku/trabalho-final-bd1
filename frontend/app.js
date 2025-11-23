@@ -98,8 +98,30 @@ function formatarDataParaBackend(data) {
     return null;
 }
 
+async function carregarCategorias() {
+    try {
+        const response = await fetch(`${API_URL}/categorias`);
+        const categorias = await response.json();
+        const selectCategoria = document.getElementById('search-categoria');
+        
+        // Limpa opções existentes (exceto a primeira)
+        selectCategoria.innerHTML = '<option value="">Todas as categorias</option>';
+        
+        // Adiciona categorias
+        categorias.forEach(categoria => {
+            const option = document.createElement('option');
+            option.value = categoria.nome_categoria;
+            option.textContent = categoria.nome_categoria;
+            selectCategoria.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+    }
+}
+
 async function buscarProdutos() {
     const nome = document.getElementById('search-nome').value;
+    const categoria = document.getElementById('search-categoria').value;
     const origem = document.getElementById('search-origem').value;
     const loja = document.getElementById('search-loja').value;
     const precoMin = document.getElementById('search-preco-min').value;
@@ -107,6 +129,7 @@ async function buscarProdutos() {
 
     const params = new URLSearchParams();
     if (nome) params.append('nome', nome);
+    if (categoria) params.append('categoria', categoria);
     if (origem) params.append('origem', origem);
     if (loja) params.append('loja', loja);
     if (precoMin) params.append('preco_min', precoMin);
@@ -938,8 +961,9 @@ function mostrarMensagem(texto, tipo) {
     }, 5000);
 }
 
-// Carregar produtos ao iniciar
+// Carregar produtos e categorias ao iniciar
 window.onload = function() {
+    carregarCategorias();
     buscarProdutos();
 };
 
