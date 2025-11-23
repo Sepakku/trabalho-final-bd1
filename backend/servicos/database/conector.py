@@ -8,7 +8,7 @@ class DatabaseManager:
 
     def __init__(self) -> None:
         self.conn = psycopg2.connect(
-            dbname="SIMarket",  # colocar o nome do seu database
+            dbname="SIMarket",  # colocar o nome do seu database, caso não tenha salvo como SIMarket
             user="postgres",
             password="postgres",  # colocar sua senha
             host="127.0.0.1",
