@@ -42,21 +42,22 @@ class VendedorService:
 
     def get_lucro_total(self, cpf_vendedor: str, meses: int = 1):
         """Retorna lucro total no período"""
-        data_inicio = datetime.now() - timedelta(days=meses * 30)
-        
+        meses = int(meses)
+        data_inicio = (datetime.now() - timedelta(days=meses * 30)).strftime("%Y-%m-%d")
+
         query = """
             SELECT 
-                COUNT(DISTINCT ped.cpf_cliente || ped.data_pedido) as total_vendas,
-                SUM(cp.quantidade * p.preco) as receita_total,
-                SUM(cp.quantidade) as total_produtos_vendidos
-            FROM produto p
-            JOIN vendeprod vp ON vp.id_produto = p.id_produto
-            JOIN contemprod cp ON cp.id_produto = p.id_produto
-            JOIN pedido ped ON ped.cpf_cliente = cp.cpf_cliente 
-                AND ped.data_pedido = cp.data_pedido
-            WHERE vp.cpf_vendedor = %s
-                AND ped.data_pedido >= %s
-                AND ped.status_pedido != 'cancelado'
+                COUNT(DISTINCT T1.cpf_cliente || '|' || T1.data_pedido) as total_vendas,
+                COALESCE(SUM(T2.quantidade * T3.preco), 0) as receita_total,
+                COALESCE(SUM(T2.quantidade), 0) as total_produtos_vendidos
+            FROM pedido T1
+            JOIN contemprod T2 ON T2.cpf_cliente = T1.cpf_cliente 
+                AND T2.data_pedido = T1.data_pedido
+            JOIN produto T3 ON T3.id_produto = T2.id_produto
+            JOIN vendeprod T4 ON T4.id_produto = T3.id_produto
+            WHERE T4.cpf_vendedor = %s
+                AND T1.data_pedido >= %s
+                AND T1.status_pedido != 'cancelado'
         """
         return self.db.execute_select_one(query, (cpf_vendedor, data_inicio))
 

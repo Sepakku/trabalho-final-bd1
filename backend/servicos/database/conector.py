@@ -16,40 +16,40 @@ class DatabaseManager:
         )
         self.cursor = self.conn.cursor(cursor_factory=DictCursor)
 
-    def execute_statement(self, statement: str, params=None) -> bool:
+        def execute_statement(self, statement: str, params=None) -> bool:
         """Usado para Inserções, Deleções, Alter Tables"""
         try:
-            self.cursor.execute(statement, params)
+            with self.conn.cursor() as cursor:
+                cursor.execute(statement, params)
             self.conn.commit()
+            return True
         except Exception as e:
             self.conn.rollback()
             print(f"Erro ao executar statement: {e}")
             return False
-        return True
 
     def execute_select_all(self, query: str, params=None):
         """Usado para SELECTS no geral"""
-        self.cursor.execute(query, params)
-        return [dict(item) for item in self.cursor.fetchall()]
+        with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute(query, params)
+            return cursor.fetchall()
 
     def execute_select_one(self, query: str, params=None):
         """Usado para SELECT com apenas uma linha de resposta"""
-        self.cursor.execute(query, params)
-        query_result = self.cursor.fetchone()
-
-        if not query_result:
-            return None
-
-        return dict(query_result)
+        with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute(query, params)
+            result = cursor.fetchone()
+            return result if result else None
     
     def execute_statement_returning(self, statement: str, params=None):
         """Usado para INSERT/UPDATE com RETURNING"""
         try:
-            self.cursor.execute(statement, params)
-            result = self.cursor.fetchone()
+            with self.conn.cursor() as cursor:
+                cursor.execute(statement, params)
+                result = cursor.fetchone()
             self.conn.commit()
             return result[0] if result else None
         except Exception as e:
             self.conn.rollback()
-            print(f"Erro ao executar statement com RETURNING: {e}")
+            print(f"Erro ao executar RETURNING: {e}")
             return None
