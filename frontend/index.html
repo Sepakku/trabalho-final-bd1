@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SI Market - E-commerce</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>SI Market</h1>
+            <div class="nav-buttons">
+                <button onclick="showCompradorView()" class="btn btn-primary">Área do Comprador</button>
+                <button onclick="showVendedorView()" class="btn btn-secondary">Área do Vendedor</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Área do Comprador -->
+        <div id="comprador-view" class="view">
+            <h2>Área do Comprador</h2>
+            
+            <div class="section" style="background-color: #f0f0f0; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
+                <h3>Meu CPF</h3>
+                <input type="text" id="comprador-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;" onchange="carregarProdutosComprados()">
+                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">Todas as operações usarão este CPF</p>
+            </div>
+            
+            <div class="section">
+                <h3>Buscar Produtos</h3>
+                <div class="search-form">
+                    <input type="text" id="search-nome" placeholder="Nome do produto">
+                    <select id="search-categoria">
+                        <option value="">Todas as categorias</option>
+                    </select>
+                    <input type="text" id="search-origem" placeholder="Origem">
+                    <input type="text" id="search-loja" placeholder="Loja">
+                    <input type="number" id="search-preco-min" placeholder="Preço mínimo">
+                    <input type="number" id="search-preco-max" placeholder="Preço máximo">
+                    <button onclick="buscarProdutos()" class="btn btn-primary">Buscar</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Produtos Disponíveis</h3>
+                <div id="produtos-lista" class="produtos-grid"></div>
+            </div>
+
+            <div class="section">
+                <h3>Meu Carrinho</h3>
+                <div class="carrinho-info">
+                    <button onclick="visualizarCarrinho()" class="btn btn-primary">Ver Carrinho</button>
+                </div>
+                <div id="carrinho-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Meus Pedidos</h3>
+                <div class="pedidos-info">
+                    <button onclick="visualizarPedidos()" class="btn btn-primary">Ver Pedidos</button>
+                </div>
+                <div id="pedidos-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Avaliar Produto</h3>
+                <div class="avaliacao-form">
+                    <select id="avaliacao-produto" style="width: 100%; padding: 0.75rem; margin: 0.5rem 0;">
+                        <option value="">Selecione um produto que você comprou</option>
+                    </select>
+                    <input type="number" id="avaliacao-nota" placeholder="Nota (1-5)" min="1" max="5">
+                    <button onclick="carregarProdutosComprados()" class="btn btn-secondary">Atualizar Lista</button>
+                    <button onclick="avaliarProduto()" class="btn btn-primary">Avaliar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área do Vendedor -->
+        <div id="vendedor-view" class="view" style="display: none;">
+            <h2>Área do Vendedor</h2>
+            
+            <div class="section">
+                <h3>Informações do Vendedor</h3>
+                <input type="text" id="vendedor-cpf" placeholder="Seu CPF">
+                <button onclick="carregarDadosVendedor()" class="btn btn-primary">Carregar Dados</button>
+                <div id="vendedor-info"></div>
+            </div>
+
+            <div class="section">
+                <h3>Estatísticas</h3>
+                <div class="stats-controls">
+                    <input type="text" id="stats-cpf" placeholder="CPF do Vendedor">
+                    <select id="stats-periodo">
+                        <option value="1">1 mês</option>
+                        <option value="3">3 meses</option>
+                        <option value="6">6 meses</option>
+                        <option value="12">12 meses</option>
+                    </select>
+                    <button onclick="carregarEstatisticas()" class="btn btn-primary">Carregar</button>
+                </div>
+                <div id="estatisticas"></div>
+            </div>
+
+            <div class="section">
+                <h3>Meus Produtos</h3>
+                <div class="produtos-controls">
+                    <input type="text" id="produtos-vendedor-cpf" placeholder="CPF do Vendedor">
+                    <button onclick="carregarProdutosVendedor()" class="btn btn-primary">Carregar Produtos</button>
+                </div>
+                <div id="produtos-vendedor-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Adicionar Produto</h3>
+                <div class="produto-form">
+                    <div class="form-group">
+                        <label for="novo-produto-cpf">CPF do Vendedor *</label>
+                        <input type="text" id="novo-produto-cpf" placeholder="Ex: 12345678901" maxlength="11" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-nome">Nome do Produto *</label>
+                        <input type="text" id="novo-produto-nome" placeholder="Ex: Notebook Gamer" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-desc">Descrição</label>
+                        <textarea id="novo-produto-desc" placeholder="Descreva o produto..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-preco">Preço (R$) *</label>
+                        <input type="number" id="novo-produto-preco" placeholder="Ex: 999.99" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="form-group estoque-group">
+                        <label for="novo-produto-estoque">📦 Quantidade em Estoque</label>
+                        <input type="number" id="novo-produto-estoque" placeholder="Ex: 50" value="0" min="0">
+                        <small class="form-help">Quantidade atual disponível para venda</small>
+                    </div>
+                    <div class="form-group alerta-group">
+                        <label for="novo-produto-alerta">⚠️ Limite de Alerta de Estoque</label>
+                        <input type="number" id="novo-produto-alerta" placeholder="Ex: 10" value="0" min="0">
+                        <small class="form-help">Quantidade mínima antes de alertar sobre estoque baixo</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="novo-produto-origem">Origem</label>
+                        <input type="text" id="novo-produto-origem" placeholder="Ex: Nacional, Importado">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <button onclick="adicionarProduto()" class="btn btn-success" style="width: 100%;">Adicionar Produto</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Cadastro de Comprador -->
+    <div id="modal-cadastro" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharModalCadastro()">&times;</span>
+            <h2>Cadastro de Novo Comprador</h2>
+            <p style="margin-bottom: 1rem; color: #666;">Preencha os dados para criar sua conta</p>
+            <form id="form-cadastro" onsubmit="cadastrarComprador(event)">
+                <input type="text" id="cadastro-cpf" placeholder="CPF (11 dígitos)" readonly style="background-color: #f0f0f0;">
+                <input type="text" id="cadastro-pnome" placeholder="Nome" required>
+                <input type="text" id="cadastro-sobrenome" placeholder="Sobrenome" required>
+                <input type="text" id="cadastro-cep" placeholder="CEP (8 dígitos, opcional)" maxlength="8">
+                <input type="email" id="cadastro-email" placeholder="Email" required>
+                <input type="password" id="cadastro-senha" placeholder="Senha" required>
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button type="submit" class="btn btn-success" style="flex: 1;">Cadastrar</button>
+                    <button type="button" onclick="fecharModalCadastro()" class="btn btn-secondary" style="flex: 1;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
