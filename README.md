@@ -20,7 +20,7 @@ Sistema de e-commerce simples com duas interfaces principais: uma para comprador
 
 ### 1. Banco de Dados
 
-1. Crie um banco de dados PostgreSQL chamado `SIMarket`
+1. Crie um banco de dados PostgreSQL chamado `SI-Market`
 2. Execute os scripts SQL na ordem:
    ```bash
    psql -U postgres -d SIMarket -f database/scripts/script-criacao.sql
