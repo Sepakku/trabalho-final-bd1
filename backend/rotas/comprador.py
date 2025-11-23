@@ -195,3 +195,14 @@ def avaliar_produto():
         return jsonify({"message": "Produto avaliado com sucesso"}), 200
     return jsonify({"error": "Erro ao avaliar produto. Verifique se você comprou este produto."}), 400
 
+@comprador_blueprint.route("/comprador/recomendacoes", methods=["GET"])
+def get_recomendacoes():
+    """Retorna recomendações baseadas na categoria preferida"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    recomendacoes = CompradorService().get_recomendacoes(cpf)
+    
+    # Se retornar lista vazia, o front tratará, mas retornamos 200 OK
+    return jsonify(recomendacoes), 200

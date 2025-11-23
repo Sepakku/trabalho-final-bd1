@@ -784,6 +784,74 @@ async function avaliarProduto() {
     }
 }
 
+async function carregarRecomendacoes() {
+    const cpf = obterCPFComprador();
+    const container = document.getElementById('recomendacao-lista');
+
+    if (!cpf) {
+        container.innerHTML = '<p class="message error" style="grid-column: 1/-1;">Informe seu CPF para receber recomendações personalizadas</p>';
+        return;
+    }
+
+    container.innerHTML = '<p>Buscando recomendações...</p>';
+
+    try {
+        const response = await fetch(`${API_URL}/comprador/recomendacoes?cpf=${cpf}`);
+        const produtos = await response.json();
+
+        if (!produtos || produtos.length === 0) {
+            container.innerHTML = '<p class="message" style="background: #e0f7fa; color: #006064; grid-column: 1/-1;">Nenhuma recomendação encontrada. Verifique se você possui uma categoria preferida cadastrada.</p>';
+            return;
+        }
+
+        container.innerHTML = produtos.map(produto => `
+            <div class="produto-card" style="border: 2px solid #764ba2;">
+                <div style="background: #764ba2; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; display: inline-block; margin-bottom: 5px;">Recomendado</div>
+                <h4>${produto.nome_produto}</h4>
+                <div class="preco">R$ ${parseFloat(produto.preco).toFixed(2)}</div>
+                <div class="info">Categoria: ${produto.nome_categoria}</div>
+                ${produto.media_nota > 0 ? `<div class="info">⭐ ${parseFloat(produto.media_nota).toFixed(1)}</div>` : ''}
+                
+                <div style="margin-top: 1rem; display: flex; gap: 5px;">
+                    <input type="number" id="qtd-rec-${produto.id_produto}" value="1" min="1" style="width: 60px; margin: 0;">
+                    <button onclick="adicionarAoCarrinhoRecomendado(${produto.id_produto})" class="btn btn-primary" style="flex: 1; padding: 0.5rem;">
+                        Adicionar ao Carrinho
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Erro:', error);
+        container.innerHTML = '<p class="message error">Erro ao carregar recomendações.</p>';
+    }
+}
+
+// Função wrapper para adicionar ao carrinho a partir da aba de recomendação
+async function adicionarAoCarrinhoRecomendado(idProduto) {
+    const cpf = obterCPFComprador();
+    const qtdInput = document.getElementById(`qtd-rec-${idProduto}`);
+    const quantidade = parseInt(qtdInput.value) || 1;
+
+    // Reutiliza a lógica de chamada de API existente, mas tratando o ID do input específico
+    try {
+        const response = await fetch(`${API_URL}/comprador/carrinho`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cpf, id_produto: idProduto, quantidade })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+            mostrarMensagem('Produto adicionado ao carrinho!', 'success');
+        } else {
+            mostrarMensagem(result.error || 'Erro ao adicionar', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarMensagem('Erro de conexão', 'error');
+    }
+}
 // ========== FUNCIONALIDADES DO VENDEDOR ==========
 
 async function carregarDadosVendedor() {
@@ -873,7 +941,7 @@ async function carregarEstatisticas() {
             </div>
 
             ${melhorAvaliacao.length > 0 ? `
-                <h4 style="margin-top: 2rem;">Produtos Melhor Avaliados</h4>
+                <h4 style="margin-top: 2rem;">Favoritos dos Clientes</h4>
                 <div class="produtos-grid">
                     ${melhorAvaliacao.slice(0, 5).map(p => `
                         <div class="produto-card">
@@ -1184,6 +1252,107 @@ async function adicionarProduto() {
     }
 }
 
+async function carregarVendasRecentes() {
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        mostrarMensagem('Informe o CPF do vendedor.', 'error');
+        return;
+    }
+
+    const limite = document.getElementById('vendas-limite').value || 5;
+    const statusFiltro = document.getElementById('vendas-filtro-status').value;
+    const container = document.getElementById('vendas-recentes-lista');
+
+    container.innerHTML = '<p>Carregando vendas...</p>';
+
+    try {
+        let url = `${API_URL}/vendedor/vendas?cpf=${cpf}&limite=${limite}`;
+        if (statusFiltro) url += `&status=${statusFiltro}`;
+
+        const response = await fetch(url);
+        const vendas = await response.json();
+
+        if (!vendas || vendas.length === 0) {
+            container.innerHTML = '<p>Nenhuma venda encontrada com os filtros atuais.</p>';
+            return;
+        }
+
+        container.innerHTML = vendas.map(venda => {
+            const dataExibicao = new Date(venda.data_pedido).toLocaleString('pt-BR');
+            // Formata data para usar como ID único e para enviar ao backend
+            const dataBackend = formatarDataParaBackend(venda.data_pedido);
+            const idUnico = `${venda.cpf_cliente}-${dataBackend.replace(/[^0-9]/g, '')}`;
+
+            return `
+            <div class="pedido-item" style="border-left: 5px solid #667eea; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+                <div style="flex: 2; min-width: 250px;">
+                    <h4 style="color: #333;">Data: ${dataExibicao}</h4>
+                    <p><strong>Produto:</strong> ${venda.nome_produto}</p>
+                    <p><strong>Cliente:</strong> ${venda.cpf_cliente}</p>
+                    <p><strong>Valor:</strong> R$ ${parseFloat(venda.total_pedido).toFixed(2)}</p>
+                    <p><strong>Status Atual:</strong> <span class="status ${venda.status_pedido}">${venda.status_pedido}</span></p>
+                    ${venda.status_entrega ? `<p><strong>Entrega:</strong> ${venda.status_entrega}</p>` : ''}
+                </div>
+                
+                <div style="flex: 1; min-width: 200px; background: #f8f9fa; padding: 10px; border-radius: 8px;">
+                    <label style="font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 5px;">Atualizar Status:</label>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <select id="status-${idUnico}" style="margin: 0; padding: 5px; font-size: 0.9rem;">
+                            <option value="enviado">Enviado</option>
+                            <option value="entregue">Entregue</option>
+                            <option value="cancelado">Cancelado</option>
+                        </select>
+                        <button onclick="salvarStatusVenda('${venda.cpf_cliente}', '${dataBackend}', 'status-${idUnico}')" 
+                                class="btn btn-success" style="padding: 5px 10px; font-size: 0.9rem;">
+                            Ok
+                        </button>
+                    </div>
+                    
+                    ${venda.status_entrega ? `
+                        <button onclick="verDetalhesEntrega('${venda.cpf_cliente}', '${dataBackend}')" 
+                                class="btn btn-primary" style="width: 100%; font-size: 0.9rem; padding: 5px;">
+                            Ver Detalhes da Entrega
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao carregar vendas recentes.', 'error');
+    }
+}
+
+async function salvarStatusVenda(cpfCliente, dataPedido, elementId) {
+    const novoStatus = document.getElementById(elementId).value;
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/vendas/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cpf_cliente: cpfCliente,
+                data_pedido: dataPedido,
+                status: novoStatus
+            })
+        });
+
+        const res = await response.json();
+        
+        if (response.ok) {
+            mostrarMensagem('Status atualizado com sucesso!', 'success');
+            carregarVendasRecentes(); // Recarrega a lista para mostrar o novo status
+        } else {
+            mostrarMensagem(res.error || 'Erro ao atualizar status', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarMensagem('Erro de conexão ao atualizar status', 'error');
+    }
+}
+
 // Função auxiliar para mostrar mensagens
 function mostrarMensagem(texto, tipo) {
     const mensagem = document.createElement('div');
@@ -1196,7 +1365,7 @@ function mostrarMensagem(texto, tipo) {
     }, 5000);
 }
 
-// Carregar produtos e categorias ao iniciar
+// Carregar produtos, categorias e recomendações ao iniciar
 window.onload = function() {
     carregarCategorias();
     buscarProdutos();

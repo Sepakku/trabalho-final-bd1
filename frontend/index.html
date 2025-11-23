@@ -24,8 +24,18 @@
             
             <div class="section" style="background-color: #f0f0f0; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
                 <h3>Meu CPF</h3>
-                <input type="text" id="comprador-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;" onchange="carregarProdutosComprados()">
+                <input type="text" id="comprador-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;" onchange="carregarProdutosComprados();carregarRecomendacoes()">
                 <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">Todas as operações usarão este CPF</p>
+            </div>
+
+            <div class="section">
+                <h3>Recomendações para Você</h3>
+                <div id="recomendacao-container">
+                    <p style="color: #666; margin-bottom: 1rem;">Produtos baseados na sua categoria favorita.</p>
+                    <div id="recomendacao-lista" class="produtos-grid">
+                        <p class="message error">Informe seu CPF acima para ver recomendações.</p>
+                    </div>
+                </div>
             </div>
             
             <div class="section">
@@ -121,6 +131,30 @@
                     <button onclick="carregarSolicitacoes()" class="btn btn-primary">Carregar Solicitações</button>
                 </div>
                 <div id="solicitacoes-lista"></div>
+            </div>
+
+            <div class="section">
+                <h3>Vendas Recentes</h3>
+                
+                <div class="search-form" style="grid-template-columns: 100px 150px 100px; gap: 10px; align-items: end; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label>Qtd:</label>
+                        <input type="number" id="vendas-limite" value="5" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Status:</label>
+                        <select id="vendas-filtro-status">
+                            <option value="">Todos</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="enviado">Enviado</option>
+                            <option value="entregue">Entregue</option>
+                            <option value="cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    <button onclick="carregarVendasRecentes()" class="btn btn-primary" style="height: 46px; margin-bottom: 8px;">Filtrar</button>
+                </div>
+
+                <div id="vendas-recentes-lista"></div>
             </div>
 
             <div class="section">

@@ -8,7 +8,7 @@ class DatabaseManager:
 
     def __init__(self) -> None:
         self.conn = psycopg2.connect(
-            dbname="SI-Market",  # colocar o nome do seu database
+            dbname="SIMarket",  # colocar o nome do seu database
             user="postgres",
             password="postgres",  # colocar sua senha
             host="127.0.0.1",
@@ -17,7 +17,7 @@ class DatabaseManager:
         self.cursor = self.conn.cursor(cursor_factory=DictCursor)
 
     def execute_statement(self, statement: str, params=None) -> bool:
-        """Usado para Inserções, Deleções, Alter Tables"""
+        """Usado para Insercoes, Delecoes, Alter Tables"""
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(statement, params)

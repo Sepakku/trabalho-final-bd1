@@ -1,5 +1,7 @@
 from backend.servicos.database.conector import DatabaseManager
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from pytz import timezone
 
 class VendedorService:
     def __init__(self, db_provider=DatabaseManager()) -> None:
@@ -404,3 +406,70 @@ class VendedorService:
                 AND data_solicitacao <= %s + INTERVAL '1 second'
         """
         return self.db.execute_statement(update, (novo_status, cpf_cliente, data_pedido_dt, data_pedido_dt, data_solicitacao_dt, data_solicitacao_dt))
+
+    def get_vendas_recentes(self, cpf_vendedor: str, limite: int = 5, status_filtro: str = ""):
+        """Retorna as vendas mais recentes do vendedor (Atualizado com status_entrega)"""
+        query = """
+            SELECT DISTINCT
+                p.data_pedido, 
+                p.status_pedido, 
+                p.cpf_cliente,
+                p.total_pedido,
+                prod.nome_produto,
+                e.status_entrega
+            FROM pedido p
+            JOIN contemprod cp ON p.cpf_cliente = cp.cpf_cliente AND p.data_pedido = cp.data_pedido
+            JOIN produto prod ON cp.id_produto = prod.id_produto
+            JOIN vendeprod vp ON prod.id_produto = vp.id_produto
+            LEFT JOIN entrega e ON e.fk_cpf_cliente = p.cpf_cliente AND e.fk_data_pedido = p.data_pedido
+            WHERE vp.cpf_vendedor = %s
+        """
+        
+        params = [cpf_vendedor]
+
+        if status_filtro:
+            query += " AND p.status_pedido = %s"
+            params.append(status_filtro)
+
+        query += " ORDER BY p.data_pedido DESC LIMIT %s"
+        params.append(limite)
+
+        return self.db.execute_select_all(query, tuple(params))
+
+    def atualizar_status_venda(self, cpf_cliente: str, data_pedido: str, novo_status: str):
+        """Atualiza o status de uma venda (pedido)"""
+        
+        # Lógica de conversão de data (mesmo padrão usado em 'atualizar_status_solicitacao')
+        data_pedido_dt = None
+        data_pedido_clean = data_pedido.strip()
+        
+        formatos = [
+            '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%d %H:%M:%S.%f'
+        ]
+        
+        try:
+            for formato in formatos:
+                try:
+                    data_pedido_dt = datetime.strptime(data_pedido_clean, formato)
+                    break
+                except ValueError:
+                    continue
+            
+            if data_pedido_dt is None:
+                # Tenta ISO format tratando o 'Z'
+                data_pedido_clean = data_pedido_clean.replace('Z', '+00:00')
+                data_pedido_dt = datetime.fromisoformat(data_pedido_clean)
+        except Exception as e:
+            print(f"Erro ao converter data_pedido: {e}")
+            return False
+
+        # Query de atualização usando intervalo de tempo para precisão
+        update = """
+            UPDATE pedido 
+            SET status_pedido = %s 
+            WHERE cpf_cliente = %s 
+            AND data_pedido >= %s - INTERVAL '1 second'
+            AND data_pedido <= %s + INTERVAL '1 second'
+        """
+        return self.db.execute_statement(update, (novo_status, cpf_cliente, data_pedido_dt, data_pedido_dt))

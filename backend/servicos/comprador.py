@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 class CompradorService:
     def __init__(self, db_provider=DatabaseManager()) -> None:
         self.db = db_provider
-
+    
     def verificar_comprador_existe(self, cpf: str):
         """Verifica se o comprador existe na tabela"""
         query_comprador = "SELECT cpf_comprador FROM comprador WHERE cpf_comprador = %s"
@@ -44,71 +44,87 @@ class CompradorService:
         return True, "Comprador criado com sucesso"
 
     def adicionar_ao_carrinho(self, cpf: str, id_produto: int, quantidade: int):
-        """Adiciona produto ao carrinho (cria pedido pendente se não existir)"""
-        # Verifica se o comprador existe
+        """
+        Adiciona produto ao carrinho/pedido.
+        Reutiliza o pedido 'pendente' mais recente e atualiza sua data com fuso horário.
+        """
         if not self.verificar_comprador_existe(cpf):
-            return None  # Retorna None para indicar que comprador não existe
-        
-        # Verifica se existe pedido pendente
-        query_pedido = """
-            SELECT cpf_cliente, data_pedido 
-            FROM pedido 
+            return None # Comprador não existe
+
+        # 1. Tenta encontrar o carrinho (pedido com status 'pendente') mais recente
+        query_carrinho_pendente = """
+            SELECT data_pedido
+            FROM pedido
             WHERE cpf_cliente = %s AND status_pedido = 'pendente'
             ORDER BY data_pedido DESC
             LIMIT 1
         """
-        pedido = self.db.execute_select_one(query_pedido, (cpf,))
+        carrinho_existente = self.db.execute_select_one(query_carrinho_pendente, (cpf,))
         
-        if not pedido:
-            # Cria novo pedido pendente
-            data_pedido = datetime.now(ZoneInfo("America/Sao_Paulo"))
-            insert_pedido = """
-                INSERT INTO pedido (cpf_cliente, data_pedido, status_pedido, total_produtos, total_pedido)
-                VALUES (%s, %s, 'pendente', 0, 0)
+        # Define a data_pedido a ser usada: AGORA COM FUSO HORÁRIO
+        # Isso utiliza o pacote 'tzdata' que você instalou.
+        data_hora_atual = datetime.now(ZoneInfo("America/Sao_Paulo")) 
+
+        if carrinho_existente:
+            # Carrinho existe: Reutilizamos a data_pedido existente
+            data_pedido_original = carrinho_existente['data_pedido']
+            
+            # ATUALIZA A DATA DO PEDIDO EXISTENTE para a hora atual com fuso horário
+            update_pedido_data = """
+                UPDATE pedido
+                SET data_pedido = %s
+                WHERE cpf_cliente = %s
+                AND data_pedido = %s
             """
-            if not self.db.execute_statement(insert_pedido, (cpf, data_pedido)):
-                return False
-        else:
-            data_pedido = pedido['data_pedido']
-        
-        # Verifica se produto já está no pedido
-        query_item = """
-            SELECT quantidade 
-            FROM contemprod 
-            WHERE cpf_cliente = %s AND data_pedido = %s AND id_produto = %s
-        """
-        item_existente = self.db.execute_select_one(query_item, (cpf, data_pedido, id_produto))
-        
-        # Busca preço do produto
-        query_preco = "SELECT preco FROM produto WHERE id_produto = %s"
-        produto = self.db.execute_select_one(query_preco, (id_produto,))
-        if not produto:
-            return False
-        
-        preco_unitario = float(produto['preco'])
-        
-        if item_existente:
-            # Atualiza quantidade
-            nova_quantidade = item_existente['quantidade'] + quantidade
-            update_item = """
-                UPDATE contemprod 
-                SET quantidade = %s 
+            # O ON UPDATE CASCADE na ContemProd garantirá que esta data seja propagada
+            if not self.db.execute_statement(update_pedido_data, (data_hora_atual, cpf, data_pedido_original)):
+                 return False
+
+            # 2. Verifica se o produto já está no carrinho
+            # Usamos a NOVA data (data_hora_atual) para buscar, devido ao CASCADE
+            query_contem = """
+                SELECT quantidade 
+                FROM contemprod 
                 WHERE cpf_cliente = %s AND data_pedido = %s AND id_produto = %s
             """
-            if not self.db.execute_statement(update_item, (nova_quantidade, cpf, data_pedido, id_produto)):
-                return False
+            item_existente = self.db.execute_select_one(query_contem, (cpf, data_hora_atual, id_produto))
+
+            if item_existente:
+                # Produto existe: Apenas atualiza a quantidade
+                nova_quantidade = item_existente['quantidade'] + quantidade
+                update_contem = """
+                    UPDATE contemprod 
+                    SET quantidade = %s
+                    WHERE cpf_cliente = %s AND data_pedido = %s AND id_produto = %s
+                """
+                return self.db.execute_statement(update_contem, (nova_quantidade, cpf, data_hora_atual, id_produto))
+            else:
+                # Produto não existe: Adiciona o item ao pedido existente
+                insert_contem = """
+                    INSERT INTO contemprod (cpf_cliente, data_pedido, id_produto, quantidade)
+                    VALUES (%s, %s, %s, %s)
+                """
+                return self.db.execute_statement(insert_contem, (cpf, data_hora_atual, id_produto, quantidade))
+            
         else:
-            # Adiciona novo item
-            insert_item = """
-                INSERT INTO contemprod (cpf_cliente, data_pedido, id_produto, quantidade)
-                VALUES (%s, %s, %s, %s)
+            # Carrinho não existe: Cria um novo pedido com status 'pendente'
+            insert_pedido = """
+                INSERT INTO pedido (cpf_cliente, data_pedido, status_pedido, total_pedido)
+                VALUES (%s, %s, 'pendente', 0) 
+                RETURNING data_pedido
             """
-            if not self.db.execute_statement(insert_item, (cpf, data_pedido, id_produto, quantidade)):
-                return False
-        
-        # Atualiza totais do pedido
-        self._atualizar_totais_pedido(cpf, data_pedido)
-        return True
+            # A data usada é a data_hora_atual (com fuso)
+            data_criada = self.db.execute_select_one(insert_pedido, (cpf, data_hora_atual))
+            
+            if data_criada:
+                # Adiciona o item
+                insert_contem = """
+                    INSERT INTO contemprod (cpf_cliente, data_pedido, id_produto, quantidade)
+                    VALUES (%s, %s, %s, %s)
+                """
+                return self.db.execute_statement(insert_contem, (cpf, data_criada['data_pedido'], id_produto, quantidade))
+            
+            return False
 
     def remover_do_carrinho(self, cpf: str, id_produto: int):
         """Remove item do carrinho (pedido pendente)"""
@@ -724,3 +740,26 @@ class CompradorService:
                 VALUES (%s, %s, %s)
             """
             return self.db.execute_statement(query, (cpf, id_produto, nota))
+
+    def get_recomendacoes(self, cpf: str):
+        """Retorna produtos baseados na categoria preferida do cliente"""
+        # Verifica se o comprador tem preferência cadastrada e busca produtos dessa categoria
+        query = """
+            SELECT DISTINCT
+                p.id_produto, 
+                p.nome_produto, 
+                p.preco, 
+                p.estoque_atual, 
+                p.origem, 
+                c.nome_categoria,
+                COALESCE(AVG(a.nota), 0) as media_nota
+            FROM produto p
+            JOIN pertencecat pc ON p.id_produto = pc.id_produto
+            JOIN preferecat pr ON pc.id_categoria = pr.id_categoria
+            JOIN categoria c ON pc.id_categoria = c.id_categoria
+            LEFT JOIN avaliaprod a ON a.id_produto = p.id_produto
+            WHERE pr.cpf_comprador = %s
+            GROUP BY p.id_produto, p.nome_produto, p.preco, p.estoque_atual, p.origem, c.nome_categoria
+            LIMIT 5
+        """
+        return self.db.execute_select_all(query, (cpf,))

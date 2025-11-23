@@ -197,3 +197,41 @@ def atualizar_status_solicitacao():
         status_texto = "aceita" if novo_status == 'concluida' else "em análise"
         return jsonify({"message": f"Solicitação {status_texto} com sucesso"}), 200
     return jsonify({"error": "Erro ao atualizar solicitação. Verifique se a solicitação pertence a este vendedor."}), 400
+
+@vendedor_blueprint.route("/vendedor/vendas", methods=["GET"])
+def get_vendas_recentes():
+    """Retorna lista de vendas recentes"""
+    cpf = request.args.get("cpf")
+    limite = request.args.get("limite", 5)
+    status = request.args.get("status", "")
+    
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    try:
+        limite = int(limite)
+    except ValueError:
+        limite = 5
+
+    vendas = VendedorService().get_vendas_recentes(cpf, limite, status)
+    return jsonify(vendas), 200
+
+@vendedor_blueprint.route("/vendedor/vendas/status", methods=["PATCH"])
+def atualizar_status_venda():
+    """Atualiza o status de uma venda"""
+    json_data = request.get_json()
+    cpf_cliente = json_data.get("cpf_cliente")
+    data_pedido = json_data.get("data_pedido")
+    novo_status = json_data.get("status")
+    
+    if not all([cpf_cliente, data_pedido, novo_status]):
+        return jsonify({"error": "Dados incompletos"}), 400
+        
+    if novo_status not in ['enviado', 'cancelado', 'entregue']:
+        return jsonify({"error": "Status inválido"}), 400
+
+    sucesso = VendedorService().atualizar_status_venda(cpf_cliente, data_pedido, novo_status)
+    
+    if sucesso:
+        return jsonify({"message": "Status atualizado com sucesso"}), 200
+    return jsonify({"error": "Erro ao atualizar status"}), 400
