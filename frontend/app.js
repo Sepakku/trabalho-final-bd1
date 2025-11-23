@@ -541,7 +541,7 @@ async function visualizarPedidos() {
                         Simular Pagamento
                     </button>
                 ` : ''}
-                <button onclick="criarSolicitacao('${cpf}', '${pedido.data_pedido}')" class="btn btn-secondary" style="margin-top: 0.5rem;">
+                <button onclick="criarSolicitacao('${cpf}', '${dataPedidoFormatada}')" class="btn btn-secondary" style="margin-top: 0.5rem;">
                     Criar Solicitação
                 </button>
             </div>
