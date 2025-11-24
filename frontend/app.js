@@ -394,34 +394,27 @@ async function visualizarCarrinho() {
     container.innerHTML = '<p>Carregando carrinho...</p>';
 
     try {
-        const response = await fetch(`${API_URL}/comprador/pedidos?cpf=${cpf}`);
+        const response = await fetch(`${API_URL}/comprador/carrinho?cpf=${cpf}`);
         
         if (!response.ok) {
-            throw new Error(`Erro ${response.status} ao buscar pedidos`);
+            throw new Error(`Erro ${response.status} ao buscar carrinho`);
         }
         
-        const pedidos = await response.json();
+        const pedidoCarrinho = await response.json();
         
-        if (!pedidos || pedidos.length === 0) {
-            container.innerHTML = '<p>Nenhum item no carrinho.</p>';
-            return;
-        }
-        
-        const pedidoPendente = pedidos.find(p => p.status_pedido === 'pendente');
-        
-        if (!pedidoPendente) {
+        if (!pedidoCarrinho) {
             container.innerHTML = '<p>Nenhum item no carrinho. Adicione produtos para ver seu carrinho aqui.</p>';
             return;
         }
 
         // Se o pedido não tem produtos ainda, mostra mensagem
-        if (!pedidoPendente.total_produtos || pedidoPendente.total_produtos === 0) {
+        if (!pedidoCarrinho.total_produtos || pedidoCarrinho.total_produtos === 0) {
             container.innerHTML = '<p>Seu carrinho está vazio. Adicione produtos para ver seu carrinho aqui.</p>';
             return;
         }
 
         // Tenta buscar detalhes do pedido para mostrar os itens
-        const dataPedidoFormatada = formatarDataParaBackend(pedidoPendente.data_pedido);
+        const dataPedidoFormatada = formatarDataParaBackend(pedidoCarrinho.data_pedido);
         let detalhes = null;
         
         if (dataPedidoFormatada) {
@@ -439,13 +432,13 @@ async function visualizarCarrinho() {
         }
         
         // Formatar data do pedido para o botão de finalizar
-        const dataPedidoParaBotao = dataPedidoFormatada || pedidoPendente.data_pedido;
+        const dataPedidoParaBotao = dataPedidoFormatada || pedidoCarrinho.data_pedido;
         
         container.innerHTML = `
             <div class="carrinho-item" style="background-color: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h4>Pedido Pendente</h4>
-                <p><strong>Total:</strong> R$ ${parseFloat(pedidoPendente.total_pedido || 0).toFixed(2)}</p>
-                <p><strong>Quantidade de itens:</strong> ${pedidoPendente.total_produtos || 0}</p>
+                <h4>Carrinho</h4>
+                <p><strong>Total:</strong> R$ ${parseFloat(pedidoCarrinho.total_pedido || 0).toFixed(2)}</p>
+                <p><strong>Quantidade de itens:</strong> ${pedidoCarrinho.total_produtos || 0}</p>
                 ${detalhes && detalhes.itens && detalhes.itens.length > 0 ? `
                     <h5 style="margin-top: 1rem;">Itens do carrinho:</h5>
                     <ul style="margin-top: 0.5rem; list-style: none; padding: 0;">
@@ -609,7 +602,7 @@ async function visualizarPedidos() {
                 ${pedido.status_pagamento ? `<p><strong>Pagamento:</strong> ${pedido.status_pagamento} ${pedido.metodo_pagamento ? `(${pedido.metodo_pagamento})` : ''}</p>` : ''}
                 ${pedido.status_entrega ? `<p><strong>Entrega:</strong> ${pedido.status_entrega} ${pedido.metodo_entrega ? `(${pedido.metodo_entrega})` : ''}</p>` : ''}
                 ${pedido.endereco_entrega ? `<p><strong>Endereço:</strong> ${pedido.endereco_entrega}</p>` : ''}
-                ${pedido.status_pagamento === 'pendente' ? `
+                ${pedido.status_pedido === 'aguardando pagamento' ? `
                     <button onclick="simularPagamento('${cpf}', '${dataPedidoFormatada}')" class="btn btn-success" style="margin-top: 0.5rem;">
                         Simular Pagamento
                     </button>
@@ -632,7 +625,7 @@ async function visualizarPedidos() {
 }
 
 async function simularPagamento(cpf, dataPedido) {
-    if (!confirm('Deseja simular o pagamento deste pedido? O status será atualizado para "aprovado".')) {
+    if (!confirm('Deseja simular o pagamento deste pedido? O status será atualizado para "pagamento confirmado".')) {
         return;
     }
 
@@ -1363,6 +1356,94 @@ function mostrarMensagem(texto, tipo) {
     setTimeout(() => {
         mensagem.remove();
     }, 5000);
+}
+
+async function carregarPedidosAguardandoEnvio() {
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+        return;
+    }
+
+    const container = document.getElementById('pedidos-envio-lista');
+    container.innerHTML = '<p>Carregando pedidos...</p>';
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/pedidos/aguardando-envio?cpf_vendedor=${cpf}`);
+        
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status} ao buscar pedidos`);
+        }
+        
+        const pedidos = await response.json();
+        
+        if (!pedidos || pedidos.length === 0) {
+            container.innerHTML = '<p>Nenhum pedido aguardando envio.</p>';
+            return;
+        }
+
+        container.innerHTML = pedidos.map(pedido => {
+            const dataPedidoFormatada = formatarDataParaBackend(pedido.data_pedido) || pedido.data_pedido;
+            
+            return `
+                <div class="pedido-item" style="background-color: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem;">
+                    <h4>Pedido de ${new Date(pedido.data_pedido).toLocaleString('pt-BR')}</h4>
+                    <p><strong>Cliente:</strong> ${pedido.nome_cliente || pedido.cpf_cliente}</p>
+                    <p><strong>Status:</strong> <span class="status ${pedido.status_pedido}">${pedido.status_pedido}</span></p>
+                    <p><strong>Total:</strong> R$ ${parseFloat(pedido.total_pedido || 0).toFixed(2)}</p>
+                    <p><strong>Itens:</strong> ${pedido.total_produtos || 0}</p>
+                    ${pedido.metodo_pagamento ? `<p><strong>Pagamento:</strong> ${pedido.metodo_pagamento}</p>` : ''}
+                    ${pedido.metodo_entrega ? `<p><strong>Método de Entrega:</strong> ${pedido.metodo_entrega}</p>` : ''}
+                    ${pedido.endereco_entrega ? `<p><strong>Endereço:</strong> ${pedido.endereco_entrega}</p>` : ''}
+                    <div style="margin-top: 1rem;">
+                        <button onclick="enviarPedido('${cpf}', '${pedido.cpf_cliente}', '${dataPedidoFormatada}')" 
+                                class="btn btn-success" style="width: 100%;">
+                            📦 Simular Envio
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Erro:', error);
+        container.innerHTML = '<p style="padding: 1rem; background-color: #f8d7da; border-radius: 4px; color: #721c24;">Erro ao carregar pedidos. Por favor, tente novamente.</p>';
+        mostrarMensagem('Erro ao carregar pedidos aguardando envio', 'error');
+    }
+}
+
+async function enviarPedido(cpfVendedor, cpfCliente, dataPedido) {
+    if (!confirm('Deseja marcar este pedido como enviado? Isso criará/atualizará a entrega e mudará o status para "enviado".')) {
+        return;
+    }
+
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        mostrarMensagem('Por favor, informe seu CPF no topo da página', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/pedido/enviar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cpf_vendedor: cpf,
+                cpf_cliente: cpfCliente,
+                data_pedido: dataPedido
+            })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            mostrarMensagem('Pedido marcado como enviado com sucesso! Entrega criada/atualizada.', 'success');
+            carregarPedidosAguardandoEnvio();
+        } else {
+            mostrarMensagem(result.error || 'Erro ao enviar pedido', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao enviar pedido', 'error');
+    }
 }
 
 // Carregar produtos, categorias e recomendações ao iniciar

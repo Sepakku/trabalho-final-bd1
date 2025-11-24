@@ -61,9 +61,22 @@ def remover_carrinho(id_produto):
     return jsonify({"error": "Erro ao remover produto do carrinho"}), 400
 
 
+@comprador_blueprint.route("/comprador/carrinho", methods=["GET"])
+def visualizar_carrinho():
+    """Visualiza o carrinho atual do comprador"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    carrinho = CompradorService().get_carrinho(cpf)
+    if carrinho:
+        return jsonify(carrinho), 200
+    return jsonify(None), 200
+
+
 @comprador_blueprint.route("/comprador/pedidos", methods=["GET"])
 def visualizar_pedidos():
-    """Visualiza pedidos do comprador"""
+    """Visualiza pedidos do comprador (excluindo carrinho)"""
     cpf = request.args.get("cpf")
     if not cpf:
         return jsonify({"error": "cpf é obrigatório"}), 400
@@ -122,7 +135,7 @@ def finalizar_pedido():
 
 @comprador_blueprint.route("/comprador/pedido/simular-pagamento", methods=["POST"])
 def simular_pagamento():
-    """Simula pagamento de um pedido, atualizando status de 'pendente' para 'aprovado'"""
+    """Simula pagamento de um pedido, atualizando status de 'aguardando pagamento' para 'pagamento confirmado'"""
     json_data = request.get_json()
     
     if not json_data:
@@ -139,9 +152,9 @@ def simular_pagamento():
     try:
         result = CompradorService().simular_pagamento(cpf, data_pedido)
         if result:
-            return jsonify({"message": "Pagamento simulado com sucesso. Status atualizado para 'aprovado'."}), 200
+            return jsonify({"message": "Pagamento simulado com sucesso. Status atualizado para 'pagamento confirmado'."}), 200
         else:
-            return jsonify({"error": "Não foi possível simular pagamento. Verifique se o pedido tem um pagamento pendente."}), 400
+            return jsonify({"error": "Não foi possível simular pagamento. Verifique se o pedido está com status 'aguardando pagamento'."}), 400
     except Exception as e:
         print(f"Erro ao simular pagamento: {e}")
         return jsonify({"error": f"Erro interno ao simular pagamento: {str(e)}"}), 500

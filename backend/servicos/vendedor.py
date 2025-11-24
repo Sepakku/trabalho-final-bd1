@@ -407,6 +407,37 @@ class VendedorService:
         """
         return self.db.execute_statement(update, (novo_status, cpf_cliente, data_pedido_dt, data_pedido_dt, data_solicitacao_dt, data_solicitacao_dt))
 
+    def get_pedidos_aguardando_envio(self, cpf_vendedor: str):
+        """Retorna todos os pedidos com status 'pagamento confirmado' aguardando envio"""
+        query = """
+            SELECT DISTINCT
+                p.cpf_cliente,
+                p.data_pedido,
+                p.status_pedido,
+                p.total_pedido,
+                p.total_produtos,
+                pg.metodo_pagamento,
+                e.metodo_entrega,
+                e.endereco_entrega,
+                u.pnome || ' ' || u.sobrenome as nome_cliente
+            FROM pedido p
+            JOIN contemprod cp ON p.cpf_cliente = cp.cpf_cliente 
+                AND cp.data_pedido >= p.data_pedido - INTERVAL '1 second'
+                AND cp.data_pedido <= p.data_pedido + INTERVAL '1 second'
+            JOIN vendeprod vp ON vp.id_produto = cp.id_produto
+            LEFT JOIN pagamento pg ON pg.fk_cpf_cliente = p.cpf_cliente 
+                AND pg.fk_data_pedido >= p.data_pedido - INTERVAL '1 second'
+                AND pg.fk_data_pedido <= p.data_pedido + INTERVAL '1 second'
+            LEFT JOIN entrega e ON e.fk_cpf_cliente = p.cpf_cliente 
+                AND e.fk_data_pedido >= p.data_pedido - INTERVAL '1 second'
+                AND e.fk_data_pedido <= p.data_pedido + INTERVAL '1 second'
+            JOIN usuario u ON u.cpf = p.cpf_cliente
+            WHERE vp.cpf_vendedor = %s
+                AND p.status_pedido = 'pagamento confirmado'
+            ORDER BY p.data_pedido DESC
+        """
+        return self.db.execute_select_all(query, (cpf_vendedor,))
+
     def get_vendas_recentes(self, cpf_vendedor: str, limite: int = 5, status_filtro: str = ""):
         """Retorna as vendas mais recentes do vendedor (Atualizado com status_entrega)"""
         query = """
@@ -473,3 +504,132 @@ class VendedorService:
             AND data_pedido <= %s + INTERVAL '1 second'
         """
         return self.db.execute_statement(update, (novo_status, cpf_cliente, data_pedido_dt, data_pedido_dt))
+
+    def enviar_pedido(self, cpf_vendedor: str, cpf_cliente: str, data_pedido: str):
+        """Marca um pedido como enviado (muda de 'pagamento confirmado' para 'enviado')"""
+        # Verifica se o pedido pertence ao vendedor
+        query_verifica = """
+            SELECT 1
+            FROM pedido p
+            JOIN contemprod cp ON cp.cpf_cliente = p.cpf_cliente 
+                AND cp.data_pedido >= p.data_pedido - INTERVAL '1 second'
+                AND cp.data_pedido <= p.data_pedido + INTERVAL '1 second'
+            JOIN vendeprod vp ON vp.id_produto = cp.id_produto
+            WHERE vp.cpf_vendedor = %s
+                AND p.cpf_cliente = %s
+                AND p.data_pedido >= %s - INTERVAL '1 second'
+                AND p.data_pedido <= %s + INTERVAL '1 second'
+                AND p.status_pedido = 'pagamento confirmado'
+            LIMIT 1
+        """
+        
+        # Converte data_pedido para datetime
+        data_pedido_dt = None
+        data_pedido_clean = data_pedido.strip()
+        
+        formatos = [
+            '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%d %H:%M:%S.%f'
+        ]
+        
+        try:
+            for formato in formatos:
+                try:
+                    data_pedido_dt = datetime.strptime(data_pedido_clean, formato)
+                    break
+                except ValueError:
+                    continue
+            
+            if data_pedido_dt is None:
+                data_pedido_clean = data_pedido_clean.replace('Z', '+00:00')
+                data_pedido_dt = datetime.fromisoformat(data_pedido_clean)
+        except Exception as e:
+            print(f"Erro ao converter data_pedido: {e}")
+            return False
+        
+        # Verifica se o pedido pertence ao vendedor
+        if not self.db.execute_select_one(query_verifica, (cpf_vendedor, cpf_cliente, data_pedido_dt, data_pedido_dt)):
+            print(f"Pedido não encontrado ou não pertence ao vendedor {cpf_vendedor}")
+            return False
+        
+        # Busca informações do pedido para criar entrega
+        query_pedido = """
+            SELECT p.total_pedido, e.metodo_entrega, e.endereco_entrega
+            FROM pedido p
+            LEFT JOIN entrega e ON e.fk_cpf_cliente = p.cpf_cliente 
+                AND e.fk_data_pedido >= p.data_pedido - INTERVAL '1 second'
+                AND e.fk_data_pedido <= p.data_pedido + INTERVAL '1 second'
+            WHERE p.cpf_cliente = %s 
+                AND p.data_pedido >= %s - INTERVAL '1 second'
+                AND p.data_pedido <= %s + INTERVAL '1 second'
+        """
+        pedido_info = self.db.execute_select_one(query_pedido, (cpf_cliente, data_pedido_dt, data_pedido_dt))
+        
+        if not pedido_info:
+            print(f"Pedido não encontrado para criar entrega")
+            return False
+        
+        # Verifica se já existe entrega
+        query_entrega_existe = """
+            SELECT id_entrega FROM entrega
+            WHERE fk_cpf_cliente = %s 
+                AND fk_data_pedido >= %s - INTERVAL '1 second'
+                AND fk_data_pedido <= %s + INTERVAL '1 second'
+        """
+        entrega_existente = self.db.execute_select_one(query_entrega_existe, (cpf_cliente, data_pedido_dt, data_pedido_dt))
+        
+        # Se não existe entrega, cria uma nova
+        if not entrega_existente:
+            metodo_entrega = pedido_info.get('metodo_entrega') or 'Correios'
+            endereco_entrega = pedido_info.get('endereco_entrega') or 'Endereço não informado'
+            data_envio = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            # Data prevista: 7 dias após envio
+            data_prevista = data_envio + timedelta(days=7)
+            
+            insert_entrega = """
+                INSERT INTO entrega (
+                    status_entrega, metodo_entrega, endereco_entrega, 
+                    data_envio, data_prevista, frete,
+                    fk_cpf_cliente, fk_data_pedido, fk_cpf_vendedor
+                )
+                VALUES ('enviado', %s, %s, %s, %s, 0, %s, %s, %s)
+            """
+            if not self.db.execute_statement(insert_entrega, (
+                metodo_entrega, endereco_entrega, data_envio, data_prevista,
+                cpf_cliente, data_pedido_dt, cpf_vendedor
+            )):
+                print(f"Erro ao criar entrega")
+                return False
+        else:
+            # Atualiza entrega existente
+            data_envio = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            data_prevista = data_envio + timedelta(days=7)
+            
+            update_entrega = """
+                UPDATE entrega
+                SET status_entrega = 'enviado',
+                    data_envio = %s,
+                    data_prevista = %s
+                WHERE fk_cpf_cliente = %s 
+                    AND fk_data_pedido >= %s - INTERVAL '1 second'
+                    AND fk_data_pedido <= %s + INTERVAL '1 second'
+            """
+            if not self.db.execute_statement(update_entrega, (
+                data_envio, data_prevista, cpf_cliente, data_pedido_dt, data_pedido_dt
+            )):
+                print(f"Erro ao atualizar entrega")
+                return False
+        
+        # Atualiza status do pedido para 'enviado'
+        update = """
+            UPDATE pedido 
+            SET status_pedido = 'enviado'
+            WHERE cpf_cliente = %s 
+                AND data_pedido >= %s - INTERVAL '1 second'
+                AND data_pedido <= %s + INTERVAL '1 second'
+                AND status_pedido = 'pagamento confirmado'
+        """
+        if not self.db.execute_statement(update, (cpf_cliente, data_pedido_dt, data_pedido_dt)):
+            return False
+        
+        return True

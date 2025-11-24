@@ -97,14 +97,20 @@ class CompradorService:
                     SET quantidade = %s
                     WHERE cpf_cliente = %s AND data_pedido = %s AND id_produto = %s
                 """
-                return self.db.execute_statement(update_contem, (nova_quantidade, cpf, data_hora_atual, id_produto))
+                if not self.db.execute_statement(update_contem, (nova_quantidade, cpf, data_hora_atual, id_produto)):
+                    return False
             else:
                 # Produto não existe: Adiciona o item ao pedido existente
                 insert_contem = """
                     INSERT INTO contemprod (cpf_cliente, data_pedido, id_produto, quantidade)
                     VALUES (%s, %s, %s, %s)
                 """
-                return self.db.execute_statement(insert_contem, (cpf, data_hora_atual, id_produto, quantidade))
+                if not self.db.execute_statement(insert_contem, (cpf, data_hora_atual, id_produto, quantidade)):
+                    return False
+            
+            # Atualiza totais do pedido
+            self._atualizar_totais_pedido(cpf, data_hora_atual)
+            return True
             
         else:
             # Carrinho não existe: Cria um novo pedido com status 'pendente'
@@ -122,7 +128,12 @@ class CompradorService:
                     INSERT INTO contemprod (cpf_cliente, data_pedido, id_produto, quantidade)
                     VALUES (%s, %s, %s, %s)
                 """
-                return self.db.execute_statement(insert_contem, (cpf, data_criada['data_pedido'], id_produto, quantidade))
+                if not self.db.execute_statement(insert_contem, (cpf, data_criada['data_pedido'], id_produto, quantidade)):
+                    return False
+                
+                # Atualiza totais do pedido
+                self._atualizar_totais_pedido(cpf, data_criada['data_pedido'])
+                return True
             
             return False
 
@@ -194,8 +205,8 @@ class CompradorService:
                 cpf, data_pedido
             ))
 
-    def get_pedidos(self, cpf: str):
-        """Retorna todos os pedidos do comprador"""
+    def get_carrinho(self, cpf: str):
+        """Retorna o carrinho atual do comprador (pedido com status 'pendente')"""
         query = """
             SELECT 
                 p.cpf_cliente,
@@ -217,6 +228,36 @@ class CompradorService:
             LEFT JOIN entrega e ON e.fk_cpf_cliente = p.cpf_cliente 
                 AND e.fk_data_pedido = p.data_pedido
             WHERE p.cpf_cliente = %s
+                AND p.status_pedido = 'pendente'
+            ORDER BY p.data_pedido DESC
+            LIMIT 1
+        """
+        return self.db.execute_select_one(query, (cpf,))
+
+    def get_pedidos(self, cpf: str):
+        """Retorna todos os pedidos do comprador (excluindo carrinho/pendente)"""
+        query = """
+            SELECT 
+                p.cpf_cliente,
+                p.data_pedido,
+                p.status_pedido,
+                p.total_produtos,
+                p.total_pedido,
+                pg.status_pagamento,
+                pg.metodo_pagamento,
+                e.status_entrega,
+                e.metodo_entrega,
+                e.endereco_entrega,
+                e.data_envio,
+                e.data_prevista,
+                e.frete
+            FROM pedido p
+            LEFT JOIN pagamento pg ON pg.fk_cpf_cliente = p.cpf_cliente 
+                AND pg.fk_data_pedido = p.data_pedido
+            LEFT JOIN entrega e ON e.fk_cpf_cliente = p.cpf_cliente 
+                AND e.fk_data_pedido = p.data_pedido
+            WHERE p.cpf_cliente = %s
+                AND p.status_pedido != 'pendente'
             ORDER BY p.data_pedido DESC
         """
         return self.db.execute_select_all(query, (cpf,))
@@ -463,11 +504,11 @@ class CompradorService:
                 print(f"Erro ao atualizar entrega para CPF: {cpf}")
                 return False
         
-        # Atualiza o status do pedido de 'pendente' para 'enviado'
+        # Atualiza o status do pedido de 'pendente' para 'aguardando pagamento'
         # Isso garante que um novo carrinho (pedido pendente) possa ser criado
         update_pedido = """
             UPDATE pedido 
-            SET status_pedido = 'enviado'
+            SET status_pedido = 'aguardando pagamento'
             WHERE cpf_cliente = %s AND data_pedido = %s
         """
         if not self.db.execute_statement(update_pedido, (cpf, data_pedido)):
@@ -475,11 +516,11 @@ class CompradorService:
             return False
         
         print(f"Pedido finalizado com sucesso para CPF: {cpf}, data: {data_pedido}")
-        print(f"Status alterado para 'enviado' - pedido finalizado")
+        print(f"Status alterado para 'aguardando pagamento' - pedido finalizado")
         return True
 
     def simular_pagamento(self, cpf: str, data_pedido: str):
-        """Simula pagamento de um pedido, atualizando status de 'pendente' para 'aprovado'"""
+        """Simula pagamento de um pedido, atualizando status de 'aguardando pagamento' para 'pagamento confirmado'"""
         # Converte string para datetime
         data_pedido_dt = None
         
@@ -615,8 +656,22 @@ class CompradorService:
             print(f"Erro ao atualizar pagamento para CPF: {cpf}")
             return False
         
+        # Atualiza status do pedido de 'aguardando pagamento' para 'pagamento confirmado'
+        update_pedido = """
+            UPDATE pedido
+            SET status_pedido = 'pagamento confirmado'
+            WHERE cpf_cliente = %s 
+                AND data_pedido >= %s - INTERVAL '1 second'
+                AND data_pedido <= %s + INTERVAL '1 second'
+                AND status_pedido = 'aguardando pagamento'
+        """
+        if not self.db.execute_statement(update_pedido, (cpf, data_pedido_pagamento, data_pedido_pagamento)):
+            print(f"Erro ao atualizar status do pedido para CPF: {cpf}")
+            return False
+        
         print(f"Pagamento simulado com sucesso para CPF: {cpf}, data: {data_pedido_dt}")
         print(f"Método de pagamento: {pagamento['metodo_pagamento']}")
+        print(f"Status do pedido alterado para 'pagamento confirmado'")
         return True
 
     def criar_solicitacao(self, cpf: str, data_pedido: str, tipo: str):

@@ -235,3 +235,29 @@ def atualizar_status_venda():
     if sucesso:
         return jsonify({"message": "Status atualizado com sucesso"}), 200
     return jsonify({"error": "Erro ao atualizar status"}), 400
+
+@vendedor_blueprint.route("/vendedor/pedidos/aguardando-envio", methods=["GET"])
+def get_pedidos_aguardando_envio():
+    """Retorna pedidos com status 'pagamento confirmado' aguardando envio"""
+    cpf_vendedor = request.args.get("cpf_vendedor")
+    if not cpf_vendedor:
+        return jsonify({"error": "cpf_vendedor é obrigatório"}), 400
+    
+    pedidos = VendedorService().get_pedidos_aguardando_envio(cpf_vendedor)
+    return jsonify(pedidos), 200
+
+@vendedor_blueprint.route("/vendedor/pedido/enviar", methods=["POST"])
+def enviar_pedido():
+    """Marca um pedido como enviado (muda de 'pagamento confirmado' para 'enviado') e cria/atualiza entrega"""
+    json_data = request.get_json()
+    cpf_vendedor = json_data.get("cpf_vendedor")
+    cpf_cliente = json_data.get("cpf_cliente")
+    data_pedido = json_data.get("data_pedido")
+    
+    if not all([cpf_vendedor, cpf_cliente, data_pedido]):
+        return jsonify({"error": "cpf_vendedor, cpf_cliente e data_pedido são obrigatórios"}), 400
+    
+    result = VendedorService().enviar_pedido(cpf_vendedor, cpf_cliente, data_pedido)
+    if result:
+        return jsonify({"message": "Pedido marcado como enviado com sucesso. Entrega criada/atualizada."}), 200
+    return jsonify({"error": "Erro ao enviar pedido. Verifique se o pedido pertence a este vendedor e está com status 'pagamento confirmado'."}), 400
