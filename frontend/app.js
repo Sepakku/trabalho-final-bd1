@@ -218,18 +218,74 @@ async function adicionarAoCarrinho(idProduto) {
     }
 }
 
-function mostrarModalCadastro(cpf) {
+async function mostrarModalCadastro(cpf) {
     const modal = document.getElementById('modal-cadastro');
     const cpfInput = document.getElementById('cadastro-cpf');
     cpfInput.value = cpf;
+    
+    // Verifica se o usuário já existe
+    try {
+        const response = await fetch(`${API_URL}/comprador/verificar-usuario?cpf=${cpf}`);
+        const info = await response.json();
+        
+        if (info.usuario_existe && !info.comprador_existe) {
+            // Usuário existe mas não é comprador - preenche campos automaticamente
+            if (info.dados_usuario) {
+                document.getElementById('cadastro-pnome').value = info.dados_usuario.pnome || '';
+                document.getElementById('cadastro-sobrenome').value = info.dados_usuario.sobrenome || '';
+                document.getElementById('cadastro-cep').value = info.dados_usuario.cep || '';
+                document.getElementById('cadastro-email').value = info.dados_usuario.email || '';
+                // Torna campos readonly e oculta senha
+                document.getElementById('cadastro-pnome').readOnly = true;
+                document.getElementById('cadastro-sobrenome').readOnly = true;
+                document.getElementById('cadastro-cep').readOnly = true;
+                document.getElementById('cadastro-email').readOnly = true;
+                document.getElementById('cadastro-senha').style.display = 'none';
+                document.getElementById('cadastro-senha').required = false;
+                // Adiciona label informativo
+                const form = document.getElementById('form-cadastro');
+                let infoMsg = form.querySelector('.info-usuario-existente');
+                if (!infoMsg) {
+                    infoMsg = document.createElement('p');
+                    infoMsg.className = 'info-usuario-existente';
+                    infoMsg.style.cssText = 'color: #28a745; font-size: 0.9rem; margin-bottom: 1rem;';
+                    infoMsg.textContent = '✓ Usuário já cadastrado. Apenas será criado o perfil de comprador.';
+                    form.insertBefore(infoMsg, form.firstChild);
+                }
+            }
+        } else {
+            // Novo usuário - campos editáveis
+            document.getElementById('cadastro-pnome').readOnly = false;
+            document.getElementById('cadastro-sobrenome').readOnly = false;
+            document.getElementById('cadastro-cep').readOnly = false;
+            document.getElementById('cadastro-email').readOnly = false;
+            document.getElementById('cadastro-senha').style.display = 'block';
+            document.getElementById('cadastro-senha').required = true;
+            const infoMsg = document.querySelector('.info-usuario-existente');
+            if (infoMsg) infoMsg.remove();
+        }
+    } catch (error) {
+        console.error('Erro ao verificar usuário:', error);
+        // Em caso de erro, mantém comportamento padrão (novo usuário)
+    }
+    
     modal.style.display = 'block';
 }
 
 function fecharModalCadastro() {
     const modal = document.getElementById('modal-cadastro');
     modal.style.display = 'none';
-    // Limpa o formulário
-    document.getElementById('form-cadastro').reset();
+    // Limpa o formulário e restaura campos
+    const form = document.getElementById('form-cadastro');
+    form.reset();
+    document.getElementById('cadastro-pnome').readOnly = false;
+    document.getElementById('cadastro-sobrenome').readOnly = false;
+    document.getElementById('cadastro-cep').readOnly = false;
+    document.getElementById('cadastro-email').readOnly = false;
+    document.getElementById('cadastro-senha').style.display = 'block';
+    document.getElementById('cadastro-senha').required = true;
+    const infoMsg = form.querySelector('.info-usuario-existente');
+    if (infoMsg) infoMsg.remove();
     produtoPendente = null;
 }
 
@@ -242,6 +298,7 @@ async function cadastrarComprador(event) {
     const cep = document.getElementById('cadastro-cep').value.trim();
     const email = document.getElementById('cadastro-email').value.trim();
     const senha = document.getElementById('cadastro-senha').value;
+    const senhaOculta = document.getElementById('cadastro-senha').style.display === 'none';
 
     // Validações básicas
     if (!cpf || cpf.length !== 11) {
@@ -249,7 +306,13 @@ async function cadastrarComprador(event) {
         return;
     }
 
-    if (!pnome || !sobrenome || !email || !senha) {
+    // Se senha está oculta, usuário já existe - não precisa de senha
+    if (!senhaOculta && !senha) {
+        mostrarMensagem('Por favor, preencha a senha', 'error');
+        return;
+    }
+
+    if (!pnome || !sobrenome || !email) {
         mostrarMensagem('Por favor, preencha todos os campos obrigatórios', 'error');
         return;
     }
@@ -263,7 +326,14 @@ async function cadastrarComprador(event) {
         const response = await fetch(`${API_URL}/comprador/cadastrar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cpf, pnome, sobrenome, cep: cep || null, email, senha })
+            body: JSON.stringify({ 
+                cpf, 
+                pnome, 
+                sobrenome, 
+                cep: cep || null, 
+                email, 
+                senha: senhaOculta ? null : senha 
+            })
         });
 
         const result = await response.json();
@@ -307,12 +377,192 @@ async function cadastrarComprador(event) {
     }
 }
 
+async function mostrarModalCadastroVendedor(cpf) {
+    const modal = document.getElementById('modal-cadastro-vendedor');
+    const cpfInput = document.getElementById('cadastro-vendedor-cpf');
+    cpfInput.value = cpf;
+    
+    // Verifica se o usuário já existe
+    try {
+        const response = await fetch(`${API_URL}/vendedor/verificar-usuario?cpf=${cpf}`);
+        const info = await response.json();
+        
+        if (info.usuario_existe && !info.vendedor_existe) {
+            // Usuário existe mas não é vendedor - preenche campos automaticamente
+            if (info.dados_usuario) {
+                document.getElementById('cadastro-vendedor-pnome').value = info.dados_usuario.pnome || '';
+                document.getElementById('cadastro-vendedor-sobrenome').value = info.dados_usuario.sobrenome || '';
+                document.getElementById('cadastro-vendedor-cep').value = info.dados_usuario.cep || '';
+                document.getElementById('cadastro-vendedor-email').value = info.dados_usuario.email || '';
+                // Torna campos readonly e oculta senha
+                document.getElementById('cadastro-vendedor-pnome').readOnly = true;
+                document.getElementById('cadastro-vendedor-sobrenome').readOnly = true;
+                document.getElementById('cadastro-vendedor-cep').readOnly = true;
+                document.getElementById('cadastro-vendedor-email').readOnly = true;
+                document.getElementById('cadastro-vendedor-senha').style.display = 'none';
+                document.getElementById('cadastro-vendedor-senha').required = false;
+                // Adiciona label informativo
+                const form = document.getElementById('form-cadastro-vendedor');
+                let infoMsg = form.querySelector('.info-usuario-existente');
+                if (!infoMsg) {
+                    infoMsg = document.createElement('p');
+                    infoMsg.className = 'info-usuario-existente';
+                    infoMsg.style.cssText = 'color: #28a745; font-size: 0.9rem; margin-bottom: 1rem;';
+                    infoMsg.textContent = '✓ Usuário já cadastrado. Apenas preencha os dados da loja.';
+                    form.insertBefore(infoMsg, form.firstChild);
+                }
+            }
+        } else {
+            // Novo usuário - campos editáveis
+            document.getElementById('cadastro-vendedor-pnome').readOnly = false;
+            document.getElementById('cadastro-vendedor-sobrenome').readOnly = false;
+            document.getElementById('cadastro-vendedor-cep').readOnly = false;
+            document.getElementById('cadastro-vendedor-email').readOnly = false;
+            document.getElementById('cadastro-vendedor-senha').style.display = 'block';
+            document.getElementById('cadastro-vendedor-senha').required = true;
+            const infoMsg = document.querySelector('.info-usuario-existente');
+            if (infoMsg) infoMsg.remove();
+        }
+    } catch (error) {
+        console.error('Erro ao verificar usuário:', error);
+        // Em caso de erro, mantém comportamento padrão (novo usuário)
+    }
+    
+    modal.style.display = 'block';
+}
+
+function fecharModalCadastroVendedor() {
+    const modal = document.getElementById('modal-cadastro-vendedor');
+    modal.style.display = 'none';
+    // Limpa o formulário e restaura campos
+    const form = document.getElementById('form-cadastro-vendedor');
+    form.reset();
+    document.getElementById('cadastro-vendedor-pnome').readOnly = false;
+    document.getElementById('cadastro-vendedor-sobrenome').readOnly = false;
+    document.getElementById('cadastro-vendedor-cep').readOnly = false;
+    document.getElementById('cadastro-vendedor-email').readOnly = false;
+    document.getElementById('cadastro-vendedor-senha').style.display = 'block';
+    document.getElementById('cadastro-vendedor-senha').required = true;
+    const infoMsg = form.querySelector('.info-usuario-existente');
+    if (infoMsg) infoMsg.remove();
+    produtoPendenteVendedor = null;
+}
+
+async function cadastrarVendedor(event) {
+    event.preventDefault();
+    
+    const cpf = document.getElementById('cadastro-vendedor-cpf').value.trim();
+    const pnome = document.getElementById('cadastro-vendedor-pnome').value.trim();
+    const sobrenome = document.getElementById('cadastro-vendedor-sobrenome').value.trim();
+    const cep = document.getElementById('cadastro-vendedor-cep').value.trim();
+    const email = document.getElementById('cadastro-vendedor-email').value.trim();
+    const senha = document.getElementById('cadastro-vendedor-senha').value;
+    const nomeLoja = document.getElementById('cadastro-vendedor-nome-loja').value.trim();
+    const descLoja = document.getElementById('cadastro-vendedor-desc-loja').value.trim();
+    const senhaOculta = document.getElementById('cadastro-vendedor-senha').style.display === 'none';
+
+    // Validações básicas
+    if (!cpf || cpf.length !== 11) {
+        mostrarMensagem('CPF deve ter 11 dígitos', 'error');
+        return;
+    }
+
+    if (!nomeLoja) {
+        mostrarMensagem('Nome da loja é obrigatório', 'error');
+        return;
+    }
+
+    // Se senha está oculta, usuário já existe - não precisa de senha
+    if (!senhaOculta && !senha) {
+        mostrarMensagem('Por favor, preencha a senha', 'error');
+        return;
+    }
+
+    if (!pnome || !sobrenome || !email) {
+        mostrarMensagem('Por favor, preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+
+    if (cep && cep.length !== 8) {
+        mostrarMensagem('CEP deve ter 8 dígitos', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/cadastrar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                cpf, 
+                pnome, 
+                sobrenome, 
+                cep: cep || null, 
+                email, 
+                senha: senhaOculta ? null : senha, 
+                nome_loja: nomeLoja, 
+                desc_loja: descLoja || null 
+            })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            mostrarMensagem('Cadastro realizado com sucesso!', 'success');
+            fecharModalCadastroVendedor();
+            
+            // Se havia um produto pendente, adiciona agora
+            if (produtoPendenteVendedor) {
+                setTimeout(async () => {
+                    try {
+                        const produtoResponse = await fetch(`${API_URL}/vendedor/produtos`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                cpf,
+                                nome: produtoPendenteVendedor.nome,
+                                descricao: produtoPendenteVendedor.descricao,
+                                preco: produtoPendenteVendedor.preco,
+                                estoque: produtoPendenteVendedor.estoque,
+                                alerta_estoque: produtoPendenteVendedor.alerta,
+                                origem: produtoPendenteVendedor.origem
+                            })
+                        });
+
+                        const produtoResult = await produtoResponse.json();
+                        if (produtoResponse.ok) {
+                            mostrarMensagem('Produto adicionado com sucesso!', 'success');
+                            carregarProdutosVendedor();
+                        } else {
+                            mostrarMensagem(produtoResult.error || 'Erro ao adicionar produto', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Erro ao adicionar produto após cadastro:', error);
+                        mostrarMensagem('Erro ao adicionar produto', 'error');
+                    }
+                    produtoPendenteVendedor = null;
+                }, 500);
+            } else {
+                // Recarrega dados do vendedor se estava tentando carregar
+                carregarDadosVendedor();
+            }
+        } else {
+            mostrarMensagem(result.error || 'Erro ao cadastrar vendedor', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarMensagem('Erro ao cadastrar vendedor. Verifique sua conexão e tente novamente.', 'error');
+    }
+}
+
 // Fechar modal ao clicar fora dele
 window.onclick = function(event) {
     const modalCadastro = document.getElementById('modal-cadastro');
+    const modalCadastroVendedor = document.getElementById('modal-cadastro-vendedor');
     const modalEntrega = document.getElementById('modal-entrega');
     if (event.target === modalCadastro) {
         fecharModalCadastro();
+    }
+    if (event.target === modalCadastroVendedor) {
+        fecharModalCadastroVendedor();
     }
     if (event.target === modalEntrega) {
         fecharModalEntrega();
@@ -600,7 +850,7 @@ async function visualizarPedidos() {
                 <p><strong>Total:</strong> R$ ${parseFloat(pedido.total_pedido || 0).toFixed(2)}</p>
                 <p><strong>Itens:</strong> ${pedido.total_produtos || 0}</p>
                 ${pedido.status_pagamento ? `<p><strong>Pagamento:</strong> ${pedido.status_pagamento} ${pedido.metodo_pagamento ? `(${pedido.metodo_pagamento})` : ''}</p>` : ''}
-                ${pedido.status_entrega ? `<p><strong>Entrega:</strong> ${pedido.status_entrega} ${pedido.metodo_entrega ? `(${pedido.metodo_entrega})` : ''}</p>` : ''}
+                ${pedido.status_entrega && pedido.status_entrega.trim() !== '' ? `<p><strong>Entrega:</strong> ${pedido.status_entrega} ${pedido.metodo_entrega ? `(${pedido.metodo_entrega})` : ''}</p>` : ''}
                 ${pedido.endereco_entrega ? `<p><strong>Endereço:</strong> ${pedido.endereco_entrega}</p>` : ''}
                 ${pedido.status_pedido === 'aguardando pagamento' ? `
                     <button onclick="simularPagamento('${cpf}', '${dataPedidoFormatada}')" class="btn btn-success" style="margin-top: 0.5rem;">
@@ -854,6 +1104,13 @@ async function carregarDadosVendedor() {
         return;
     }
 
+    // Verifica se o vendedor existe
+    const vendedorExiste = await verificarVendedorExiste(cpf);
+    if (!vendedorExiste) {
+        mostrarModalCadastroVendedor(cpf);
+        return;
+    }
+
     try {
         const response = await fetch(`${API_URL}/vendedor?cpf=${cpf}`);
         const vendedor = await response.json();
@@ -871,7 +1128,11 @@ async function carregarDadosVendedor() {
                 </div>
             `;
         } else {
-            container.innerHTML = '<p>Vendedor não encontrado.</p>';
+            if (vendedor.error === 'Vendedor não encontrado') {
+                mostrarModalCadastroVendedor(cpf);
+            } else {
+                container.innerHTML = '<p>Vendedor não encontrado.</p>';
+            }
         }
     } catch (error) {
         console.error('Erro:', error);
@@ -1127,7 +1388,7 @@ async function carregarSolicitacoes() {
 }
 
 async function aceitarSolicitacao(cpfVendedor, cpfCliente, dataPedido, dataSolicitacao) {
-    if (!confirm('Deseja aceitar esta solicitação? O status será alterado para "em análise".')) {
+    if (!confirm('Deseja aceitar esta solicitação? O status será alterado para "concluída".')) {
         return;
     }
 
@@ -1140,13 +1401,13 @@ async function aceitarSolicitacao(cpfVendedor, cpfCliente, dataPedido, dataSolic
                 cpf_cliente: cpfCliente,
                 data_pedido: dataPedido,
                 data_solicitacao: dataSolicitacao,
-                status: 'em_analise'
+                status: 'concluida'
             })
         });
 
         const result = await response.json();
         if (response.ok) {
-            mostrarMensagem('Solicitação aceita! Status atualizado para "em análise".', 'success');
+            mostrarMensagem('Solicitação aceita! Status atualizado para "concluída".', 'success');
             setTimeout(() => {
                 carregarSolicitacoes();
             }, 500);
@@ -1192,6 +1453,21 @@ async function recusarSolicitacao(cpfVendedor, cpfCliente, dataPedido, dataSolic
     }
 }
 
+let produtoPendenteVendedor = null;
+
+async function verificarVendedorExiste(cpf) {
+    if (!cpf) return false;
+    
+    try {
+        const response = await fetch(`${API_URL}/vendedor/verificar?cpf=${cpf}`);
+        const result = await response.json();
+        return result.existe === true;
+    } catch (error) {
+        console.error('Erro ao verificar vendedor:', error);
+        return false;
+    }
+}
+
 async function adicionarProduto() {
     const cpf = obterCPFVendedor();
     const nome = document.getElementById('novo-produto-nome').value;
@@ -1208,6 +1484,22 @@ async function adicionarProduto() {
 
     if (!nome || isNaN(preco)) {
         mostrarMensagem('Por favor, preencha nome e preço', 'error');
+        return;
+    }
+
+    // Verifica se o vendedor existe
+    const vendedorExiste = await verificarVendedorExiste(cpf);
+    if (!vendedorExiste) {
+        // Salva os dados do produto para adicionar após cadastro
+        produtoPendenteVendedor = {
+            nome,
+            descricao,
+            preco,
+            estoque,
+            alerta,
+            origem
+        };
+        mostrarModalCadastroVendedor(cpf);
         return;
     }
 
@@ -1236,8 +1528,21 @@ async function adicionarProduto() {
             document.getElementById('novo-produto-estoque').value = '0';
             document.getElementById('novo-produto-alerta').value = '0';
             document.getElementById('novo-produto-origem').value = '';
+            carregarProdutosVendedor();
         } else {
-            mostrarMensagem(result.error || 'Erro ao adicionar produto', 'error');
+            if (result.error === 'vendedor_nao_existe') {
+                produtoPendenteVendedor = {
+                    nome,
+                    descricao,
+                    preco,
+                    estoque,
+                    alerta,
+                    origem
+                };
+                mostrarModalCadastroVendedor(cpf);
+            } else {
+                mostrarMensagem(result.error || 'Erro ao adicionar produto', 'error');
+            }
         }
     } catch (error) {
         console.error('Erro:', error);
@@ -1288,18 +1593,12 @@ async function carregarVendasRecentes() {
                 </div>
                 
                 <div style="flex: 1; min-width: 200px; background: #f8f9fa; padding: 10px; border-radius: 8px;">
-                    <label style="font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 5px;">Atualizar Status:</label>
-                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-                        <select id="status-${idUnico}" style="margin: 0; padding: 5px; font-size: 0.9rem;">
-                            <option value="enviado">Enviado</option>
-                            <option value="entregue">Entregue</option>
-                            <option value="cancelado">Cancelado</option>
-                        </select>
-                        <button onclick="salvarStatusVenda('${venda.cpf_cliente}', '${dataBackend}', 'status-${idUnico}')" 
-                                class="btn btn-success" style="padding: 5px 10px; font-size: 0.9rem;">
-                            Ok
+                    ${venda.status_pedido !== 'entregue' ? `
+                        <button onclick="marcarEntregaConcluida('${venda.cpf_cliente}', '${dataBackend}')" 
+                                class="btn btn-success" style="width: 100%; font-size: 0.9rem; padding: 8px; margin-bottom: 10px;">
+                            ✅ Marcar Entrega como Concluída
                         </button>
-                    </div>
+                    ` : ''}
                     
                     ${venda.status_entrega ? `
                         <button onclick="verDetalhesEntrega('${venda.cpf_cliente}', '${dataBackend}')" 
@@ -1318,8 +1617,10 @@ async function carregarVendasRecentes() {
     }
 }
 
-async function salvarStatusVenda(cpfCliente, dataPedido, elementId) {
-    const novoStatus = document.getElementById(elementId).value;
+async function marcarEntregaConcluida(cpfCliente, dataPedido) {
+    if (!confirm('Deseja marcar esta entrega como concluída? O status do pedido será alterado para "entregue".')) {
+        return;
+    }
 
     try {
         const response = await fetch(`${API_URL}/vendedor/vendas/status`, {
@@ -1328,17 +1629,17 @@ async function salvarStatusVenda(cpfCliente, dataPedido, elementId) {
             body: JSON.stringify({
                 cpf_cliente: cpfCliente,
                 data_pedido: dataPedido,
-                status: novoStatus
+                status: 'entregue'
             })
         });
 
         const res = await response.json();
         
         if (response.ok) {
-            mostrarMensagem('Status atualizado com sucesso!', 'success');
+            mostrarMensagem('Entrega marcada como concluída com sucesso!', 'success');
             carregarVendasRecentes(); // Recarrega a lista para mostrar o novo status
         } else {
-            mostrarMensagem(res.error || 'Erro ao atualizar status', 'error');
+            mostrarMensagem(res.error || 'Erro ao marcar entrega como concluída', 'error');
         }
     } catch (e) {
         console.error(e);

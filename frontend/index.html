@@ -232,6 +232,29 @@
         </div>
     </div>
 
+    <!-- Modal de Cadastro de Vendedor -->
+    <div id="modal-cadastro-vendedor" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="fecharModalCadastroVendedor()">&times;</span>
+            <h2>Cadastro de Novo Vendedor</h2>
+            <p style="margin-bottom: 1rem; color: #666;">Preencha os dados para criar sua conta de vendedor</p>
+            <form id="form-cadastro-vendedor" onsubmit="cadastrarVendedor(event)">
+                <input type="text" id="cadastro-vendedor-cpf" placeholder="CPF (11 dígitos)" readonly style="background-color: #f0f0f0;">
+                <input type="text" id="cadastro-vendedor-pnome" placeholder="Nome" required>
+                <input type="text" id="cadastro-vendedor-sobrenome" placeholder="Sobrenome" required>
+                <input type="text" id="cadastro-vendedor-cep" placeholder="CEP (8 dígitos, opcional)" maxlength="8">
+                <input type="email" id="cadastro-vendedor-email" placeholder="Email" required>
+                <input type="password" id="cadastro-vendedor-senha" placeholder="Senha" required>
+                <input type="text" id="cadastro-vendedor-nome-loja" placeholder="Nome da Loja" required>
+                <input type="text" id="cadastro-vendedor-desc-loja" placeholder="Descrição da Loja (opcional)">
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button type="submit" class="btn btn-success" style="flex: 1;">Cadastrar</button>
+                    <button type="button" onclick="fecharModalCadastroVendedor()" class="btn btn-secondary" style="flex: 1;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

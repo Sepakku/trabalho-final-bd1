@@ -12,36 +12,57 @@ class CompradorService:
         comprador = self.db.execute_select_one(query_comprador, (cpf,))
         return comprador is not None
 
-    def criar_comprador(self, cpf: str, pnome: str, sobrenome: str, cep: str, email: str, senha_hash: str):
-        """Cria um novo usuário e comprador"""
-        # Verifica se já existe usuário
+    def verificar_usuario_existe(self, cpf: str):
+        """Verifica se o usuário existe na tabela usuario"""
         query_usuario = "SELECT cpf FROM usuario WHERE cpf = %s"
         usuario = self.db.execute_select_one(query_usuario, (cpf,))
-        
-        if usuario:
-            return False, "Usuário já existe com este CPF"
-        
+        return usuario is not None
+    
+    def obter_dados_usuario(self, cpf: str):
+        """Obtém os dados do usuário da tabela usuario"""
+        query_usuario = "SELECT cpf, pnome, sobrenome, cep, email FROM usuario WHERE cpf = %s"
+        return self.db.execute_select_one(query_usuario, (cpf,))
+    
+    def criar_comprador(self, cpf: str, pnome: str = None, sobrenome: str = None, cep: str = None, email: str = None, senha_hash: str = None):
+        """Cria um novo usuário e comprador, ou apenas comprador se usuário já existir"""
         # Verifica se já existe comprador
         if self.verificar_comprador_existe(cpf):
             return False, "Comprador já existe com este CPF"
         
-        # Cria usuário
-        insert_usuario = """
-            INSERT INTO usuario (cpf, pnome, sobrenome, cep, email, senha_hash)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """
-        if not self.db.execute_statement(insert_usuario, (cpf, pnome, sobrenome, cep or None, email, senha_hash)):
-            return False, "Erro ao criar usuário"
+        # Verifica se já existe usuário
+        usuario_existente = self.obter_dados_usuario(cpf)
         
-        # Cria comprador
-        insert_comprador = """
-            INSERT INTO comprador (cpf_comprador, num_compras)
-            VALUES (%s, 0)
-        """
-        if not self.db.execute_statement(insert_comprador, (cpf,)):
-            return False, "Erro ao criar comprador"
-        
-        return True, "Comprador criado com sucesso"
+        if usuario_existente:
+            # Usuário já existe, apenas cria o comprador usando dados existentes
+            insert_comprador = """
+                INSERT INTO comprador (cpf_comprador, num_compras)
+                VALUES (%s, 0)
+            """
+            if not self.db.execute_statement(insert_comprador, (cpf,)):
+                return False, "Erro ao criar comprador"
+            return True, "Comprador criado com sucesso (usando dados do usuário existente)"
+        else:
+            # Usuário não existe, precisa criar usuário e comprador
+            if not all([pnome, sobrenome, email, senha_hash]):
+                return False, "Para criar novo usuário, são necessários: pnome, sobrenome, email e senha"
+            
+            # Cria usuário
+            insert_usuario = """
+                INSERT INTO usuario (cpf, pnome, sobrenome, cep, email, senha_hash)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            if not self.db.execute_statement(insert_usuario, (cpf, pnome, sobrenome, cep or None, email, senha_hash)):
+                return False, "Erro ao criar usuário"
+            
+            # Cria comprador
+            insert_comprador = """
+                INSERT INTO comprador (cpf_comprador, num_compras)
+                VALUES (%s, 0)
+            """
+            if not self.db.execute_statement(insert_comprador, (cpf,)):
+                return False, "Erro ao criar comprador"
+            
+            return True, "Comprador criado com sucesso"
 
     def adicionar_ao_carrinho(self, cpf: str, id_produto: int, quantidade: int):
         """
@@ -204,6 +225,54 @@ class CompradorService:
                 float(totais['total_pedido'] or 0),
                 cpf, data_pedido
             ))
+
+    def _atualizar_estoque_pedido(self, cpf: str, data_pedido: datetime, restaurar: bool = False):
+        """Atualiza o estoque dos produtos de um pedido
+        Se restaurar=True, aumenta o estoque (para pedidos cancelados)
+        Se restaurar=False, reduz o estoque (para pedidos confirmados)
+        """
+        # Busca todos os produtos do pedido
+        query_produtos = """
+            SELECT cp.id_produto, cp.quantidade
+            FROM contemprod cp
+            WHERE cp.cpf_cliente = %s AND cp.data_pedido = %s
+        """
+        produtos = self.db.execute_select_all(query_produtos, (cpf, data_pedido))
+        
+        if not produtos:
+            return
+        
+        for produto in produtos:
+            id_produto = produto['id_produto']
+            quantidade = produto['quantidade']
+            
+            if restaurar:
+                # Restaura estoque (aumenta)
+                update = """
+                    UPDATE produto
+                    SET estoque_atual = estoque_atual + %s
+                    WHERE id_produto = %s
+                """
+                self.db.execute_statement(update, (quantidade, id_produto))
+            else:
+                # Reduz estoque
+                # Verifica se há estoque suficiente antes de reduzir
+                query_estoque = """
+                    SELECT estoque_atual FROM produto WHERE id_produto = %s
+                """
+                estoque_atual = self.db.execute_select_one(query_estoque, (id_produto,))
+                
+                if estoque_atual and estoque_atual['estoque_atual'] < quantidade:
+                    print(f"Aviso: Estoque insuficiente para produto {id_produto}. Estoque atual: {estoque_atual['estoque_atual']}, necessário: {quantidade}")
+                    # Continua mesmo assim, mas registra o aviso
+                
+                update = """
+                    UPDATE produto
+                    SET estoque_atual = estoque_atual - %s
+                    WHERE id_produto = %s
+                        AND estoque_atual >= %s
+                """
+                self.db.execute_statement(update, (quantidade, id_produto, quantidade))
 
     def get_carrinho(self, cpf: str):
         """Retorna o carrinho atual do comprador (pedido com status 'pendente')"""
@@ -515,6 +584,9 @@ class CompradorService:
             print(f"Erro ao atualizar status do pedido para CPF: {cpf}")
             return False
         
+        # Atualiza estoque quando o pedido sai de 'pendente' para 'aguardando pagamento'
+        self._atualizar_estoque_pedido(cpf, data_pedido, restaurar=False)
+        
         print(f"Pedido finalizado com sucesso para CPF: {cpf}, data: {data_pedido}")
         print(f"Status alterado para 'aguardando pagamento' - pedido finalizado")
         return True
@@ -724,13 +796,43 @@ class CompradorService:
         data_solicitacao = datetime.now(ZoneInfo("America/Sao_Paulo"))
         status_solicitacao = 'aberta'
         
+        # Cria a solicitação
         query = """
             INSERT INTO solicitacao (cpf_cliente, data_pedido, data_solicitacao, tipo, status_solicitacao)
             VALUES (%s, %s, %s, %s, %s)
         """
-        return self.db.execute_statement(query, (
+        if not self.db.execute_statement(query, (
             cpf, data_pedido_exata, data_solicitacao, tipo, status_solicitacao
-        ))
+        )):
+            return False
+        
+        # Verifica o status atual do pedido antes de cancelar
+        query_status = """
+            SELECT status_pedido FROM pedido
+            WHERE cpf_cliente = %s
+                AND data_pedido >= %s - INTERVAL '1 second'
+                AND data_pedido <= %s + INTERVAL '1 second'
+        """
+        pedido_info = self.db.execute_select_one(query_status, (cpf, data_pedido_exata, data_pedido_exata))
+        status_anterior = pedido_info['status_pedido'] if pedido_info else None
+        
+        # Cancela o pedido quando a solicitação é criada
+        update_pedido = """
+            UPDATE pedido
+            SET status_pedido = 'cancelado'
+            WHERE cpf_cliente = %s
+                AND data_pedido >= %s - INTERVAL '1 second'
+                AND data_pedido <= %s + INTERVAL '1 second'
+        """
+        if not self.db.execute_statement(update_pedido, (cpf, data_pedido_exata, data_pedido_exata)):
+            print(f"Erro ao cancelar pedido após criar solicitação")
+            # Não retorna False aqui para não reverter a criação da solicitação
+        
+        # Se o pedido não estava 'pendente', restaura o estoque
+        if status_anterior and status_anterior != 'pendente' and status_anterior != 'cancelado':
+            self._atualizar_estoque_pedido(cpf, data_pedido_exata, restaurar=True)
+        
+        return True
 
     def get_produtos_comprados(self, cpf: str):
         """Retorna lista de produtos que o comprador já comprou (pedidos finalizados)"""

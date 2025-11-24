@@ -108,50 +108,68 @@ class VendedorService:
         vendedor = self.db.execute_select_one(query_vendedor, (cpf,))
         return vendedor is not None
 
-    def criar_vendedor(self, cpf: str, nome_loja: str, desc_loja: str = ""):
-        """Cria um novo usuário e vendedor"""
-        # Verifica se já existe usuário
+    def verificar_usuario_existe(self, cpf: str):
+        """Verifica se o usuário existe na tabela usuario"""
         query_usuario = "SELECT cpf FROM usuario WHERE cpf = %s"
         usuario = self.db.execute_select_one(query_usuario, (cpf,))
-        
-        if not usuario:
-            # Cria usuário com dados mínimos
-            email = f"vendedor_{cpf}@ecommerce.local"
-            senha_hash = "hash_padrao"  # Senha padrão para vendedores criados automaticamente
-            pnome = "Vendedor"
-            sobrenome = cpf[:4]  # Usa primeiros 4 dígitos do CPF como sobrenome
-            
-            insert_usuario = """
-                INSERT INTO usuario (cpf, pnome, sobrenome, cep, email, senha_hash)
-                VALUES (%s, %s, %s, NULL, %s, %s)
-            """
-            if not self.db.execute_statement(insert_usuario, (cpf, pnome, sobrenome, email, senha_hash)):
-                print(f"Erro ao criar usuário para CPF: {cpf}")
-                return False, "Erro ao criar usuário"
-        
+        return usuario is not None
+    
+    def obter_dados_usuario(self, cpf: str):
+        """Obtém os dados do usuário da tabela usuario"""
+        query_usuario = "SELECT cpf, pnome, sobrenome, cep, email FROM usuario WHERE cpf = %s"
+        return self.db.execute_select_one(query_usuario, (cpf,))
+    
+    def criar_vendedor(self, cpf: str, nome_loja: str, desc_loja: str = "", pnome: str = None, sobrenome: str = None, cep: str = None, email: str = None, senha_hash: str = None):
+        """Cria um novo usuário e vendedor, ou apenas vendedor se usuário já existir"""
         # Verifica se já existe vendedor
         if self.verificar_vendedor_existe(cpf):
             return False, "Vendedor já existe com este CPF"
         
-        # Cria vendedor
-        insert_vendedor = """
-            INSERT INTO vendedor (cpf_vendedor, nome_loja, desc_loja)
-            VALUES (%s, %s, %s)
-        """
-        if not self.db.execute_statement(insert_vendedor, (cpf, nome_loja, desc_loja or "")):
-            print(f"Erro ao criar vendedor para CPF: {cpf}")
-            return False, "Erro ao criar vendedor"
+        # Verifica se já existe usuário
+        usuario_existente = self.obter_dados_usuario(cpf)
         
-        return True, "Vendedor criado com sucesso"
+        if usuario_existente:
+            # Usuário já existe, apenas cria o vendedor usando dados existentes
+            insert_vendedor = """
+                INSERT INTO vendedor (cpf_vendedor, nome_loja, desc_loja)
+                VALUES (%s, %s, %s)
+            """
+            if not self.db.execute_statement(insert_vendedor, (cpf, nome_loja, desc_loja or "")):
+                print(f"Erro ao criar vendedor para CPF: {cpf}")
+                return False, "Erro ao criar vendedor"
+            return True, "Vendedor criado com sucesso (usando dados do usuário existente)"
+        else:
+            # Usuário não existe, precisa criar usuário e vendedor
+            if not all([pnome, sobrenome, email, senha_hash]):
+                return False, "Para criar novo usuário, são necessários: pnome, sobrenome, email e senha"
+            
+            # Cria usuário
+            insert_usuario = """
+                INSERT INTO usuario (cpf, pnome, sobrenome, cep, email, senha_hash)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            if not self.db.execute_statement(insert_usuario, (cpf, pnome, sobrenome, cep or None, email, senha_hash)):
+                print(f"Erro ao criar usuário para CPF: {cpf}")
+                return False, "Erro ao criar usuário"
+            
+            # Cria vendedor
+            insert_vendedor = """
+                INSERT INTO vendedor (cpf_vendedor, nome_loja, desc_loja)
+                VALUES (%s, %s, %s)
+            """
+            if not self.db.execute_statement(insert_vendedor, (cpf, nome_loja, desc_loja or "")):
+                print(f"Erro ao criar vendedor para CPF: {cpf}")
+                return False, "Erro ao criar vendedor"
+            
+            return True, "Vendedor criado com sucesso"
 
     def adicionar_produto(self, cpf_vendedor: str, nome: str, descricao: str, 
                          preco: float, estoque: int, alerta_estoque: int, origem: str = ""):
         """Adiciona novo produto à loja"""
-        # Verifica se o vendedor existe, se não existir, cria automaticamente
+        # Verifica se o vendedor existe
         if not self.verificar_vendedor_existe(cpf_vendedor):
-            # Cria vendedor com nome de loja padrão
-            nome_loja = f"Loja {cpf_vendedor[:4]}"
-            success, message = self.criar_vendedor(cpf_vendedor, nome_loja, f"Loja criada automaticamente para CPF {cpf_vendedor}")
+            # Não cria automaticamente mais - deve ser criado via modal
+            return False
             if not success:
                 print(f"Erro ao criar vendedor automaticamente: {message}")
                 return False

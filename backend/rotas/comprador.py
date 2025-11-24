@@ -23,9 +23,27 @@ def adicionar_carrinho():
     return jsonify({"error": "Erro ao adicionar produto"}), 400
 
 
+@comprador_blueprint.route("/comprador/verificar-usuario", methods=["GET"])
+def verificar_usuario_comprador():
+    """Verifica se o usuário existe e se já é comprador"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    service = CompradorService()
+    usuario_existe = service.verificar_usuario_existe(cpf)
+    comprador_existe = service.verificar_comprador_existe(cpf)
+    dados_usuario = service.obter_dados_usuario(cpf) if usuario_existe else None
+    
+    return jsonify({
+        "usuario_existe": usuario_existe,
+        "comprador_existe": comprador_existe,
+        "dados_usuario": dados_usuario
+    }), 200
+
 @comprador_blueprint.route("/comprador/cadastrar", methods=["POST"])
 def cadastrar_comprador():
-    """Cadastra um novo comprador"""
+    """Cadastra um novo comprador (cria usuário se não existir)"""
     json_data = request.get_json()
     cpf = json_data.get("cpf")
     pnome = json_data.get("pnome")
@@ -34,14 +52,24 @@ def cadastrar_comprador():
     email = json_data.get("email")
     senha = json_data.get("senha")
     
-    if not cpf or not pnome or not sobrenome or not email or not senha:
-        return jsonify({"error": "cpf, pnome, sobrenome, email e senha são obrigatórios"}), 400
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
     
-    # Hash simples da senha (em produção, usar bcrypt ou similar)
-    import hashlib
-    senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+    service = CompradorService()
+    usuario_existe = service.verificar_usuario_existe(cpf)
     
-    success, message = CompradorService().criar_comprador(cpf, pnome, sobrenome, cep, email, senha_hash)
+    # Se usuário não existe, precisa de todos os dados
+    if not usuario_existe:
+        if not pnome or not sobrenome or not email or not senha:
+            return jsonify({"error": "Para novo usuário, são necessários: pnome, sobrenome, email e senha"}), 400
+        # Hash simples da senha (em produção, usar bcrypt ou similar)
+        import hashlib
+        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+    else:
+        # Usuário existe, senha não é necessária
+        senha_hash = None
+    
+    success, message = service.criar_comprador(cpf, pnome, sobrenome, cep, email, senha_hash)
     if success:
         return jsonify({"message": message}), 201
     return jsonify({"error": message}), 400

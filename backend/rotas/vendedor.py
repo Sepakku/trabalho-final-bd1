@@ -16,6 +16,69 @@ def get_vendedor():
         return jsonify(vendedor), 200
     return jsonify({"error": "Vendedor não encontrado"}), 404
 
+@vendedor_blueprint.route("/vendedor/verificar", methods=["GET"])
+def verificar_vendedor():
+    """Verifica se o vendedor existe"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    existe = VendedorService().verificar_vendedor_existe(cpf)
+    return jsonify({"existe": existe}), 200
+
+@vendedor_blueprint.route("/vendedor/verificar-usuario", methods=["GET"])
+def verificar_usuario_vendedor():
+    """Verifica se o usuário existe e se já é vendedor"""
+    cpf = request.args.get("cpf")
+    if not cpf:
+        return jsonify({"error": "cpf é obrigatório"}), 400
+    
+    service = VendedorService()
+    usuario_existe = service.verificar_usuario_existe(cpf)
+    vendedor_existe = service.verificar_vendedor_existe(cpf)
+    dados_usuario = service.obter_dados_usuario(cpf) if usuario_existe else None
+    
+    return jsonify({
+        "usuario_existe": usuario_existe,
+        "vendedor_existe": vendedor_existe,
+        "dados_usuario": dados_usuario
+    }), 200
+
+@vendedor_blueprint.route("/vendedor/cadastrar", methods=["POST"])
+def cadastrar_vendedor():
+    """Cadastra um novo vendedor (cria usuário se não existir)"""
+    json_data = request.get_json()
+    cpf = json_data.get("cpf")
+    pnome = json_data.get("pnome")
+    sobrenome = json_data.get("sobrenome")
+    cep = json_data.get("cep")
+    email = json_data.get("email")
+    senha = json_data.get("senha")
+    nome_loja = json_data.get("nome_loja")
+    desc_loja = json_data.get("desc_loja", "")
+    
+    if not cpf or not nome_loja:
+        return jsonify({"error": "cpf e nome_loja são obrigatórios"}), 400
+    
+    service = VendedorService()
+    usuario_existe = service.verificar_usuario_existe(cpf)
+    
+    # Se usuário não existe, precisa de todos os dados
+    if not usuario_existe:
+        if not pnome or not sobrenome or not email or not senha:
+            return jsonify({"error": "Para novo usuário, são necessários: pnome, sobrenome, email e senha"}), 400
+        # Hash simples da senha (em produção, usar bcrypt ou similar)
+        import hashlib
+        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+    else:
+        # Usuário existe, senha não é necessária
+        senha_hash = None
+    
+    success, message = service.criar_vendedor(cpf, nome_loja, desc_loja, pnome, sobrenome, cep, email, senha_hash)
+    if success:
+        return jsonify({"message": message}), 201
+    return jsonify({"error": message}), 400
+
 
 @vendedor_blueprint.route("/vendedor/produtos/mais-vendidos", methods=["GET"])
 def get_produtos_mais_vendidos():
@@ -81,6 +144,8 @@ def adicionar_produto():
         return jsonify({"error": "cpf, nome e preco são obrigatórios"}), 400
     
     result = VendedorService().adicionar_produto(cpf, nome, descricao, preco, estoque, alerta_estoque, origem)
+    if result is None:
+        return jsonify({"error": "vendedor_nao_existe", "message": "Vendedor não encontrado. Por favor, cadastre-se primeiro."}), 404
     if result:
         return jsonify({"message": "Produto adicionado com sucesso"}), 201
     return jsonify({"error": "Erro ao adicionar produto"}), 400
