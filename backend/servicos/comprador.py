@@ -205,26 +205,70 @@ class CompradorService:
 
     def _atualizar_totais_pedido(self, cpf: str, data_pedido: datetime):
         """Atualiza total_produtos e total_pedido do pedido"""
+        # Usa intervalo de tempo para garantir que encontre o pedido mesmo com pequenas diferenças de timestamp
         query = """
-            SELECT SUM(cp.quantidade) as total_produtos,
-                   SUM(cp.quantidade * p.preco) as total_pedido
+            SELECT 
+                COALESCE(SUM(cp.quantidade), 0) as total_produtos,
+                COALESCE(SUM(cp.quantidade * p.preco), 0) as total_pedido
             FROM contemprod cp
-            JOIN produto p ON p.id_produto = cp.id_produto
-            WHERE cp.cpf_cliente = %s AND cp.data_pedido = %s
+            INNER JOIN produto p ON p.id_produto = cp.id_produto
+            WHERE cp.cpf_cliente = %s 
+                AND cp.data_pedido >= %s - INTERVAL '1 second'
+                AND cp.data_pedido <= %s + INTERVAL '1 second'
         """
-        totais = self.db.execute_select_one(query, (cpf, data_pedido))
+        totais = self.db.execute_select_one(query, (cpf, data_pedido, data_pedido))
         
         if totais:
-            update = """
-                UPDATE pedido 
-                SET total_produtos = %s, total_pedido = %s
-                WHERE cpf_cliente = %s AND data_pedido = %s
+            total_produtos = int(totais.get('total_produtos', 0) or 0)
+            total_pedido = float(totais.get('total_pedido', 0) or 0)
+            
+            # Busca o data_pedido exato do banco para garantir que o UPDATE funcione
+            query_pedido_exato = """
+                SELECT data_pedido
+                FROM pedido
+                WHERE cpf_cliente = %s
+                    AND data_pedido >= %s - INTERVAL '1 second'
+                    AND data_pedido <= %s + INTERVAL '1 second'
+                LIMIT 1
             """
-            self.db.execute_statement(update, (
-                int(totais['total_produtos'] or 0),
-                float(totais['total_pedido'] or 0),
-                cpf, data_pedido
-            ))
+            pedido_exato = self.db.execute_select_one(query_pedido_exato, (cpf, data_pedido, data_pedido))
+            
+            if pedido_exato:
+                data_pedido_exata = pedido_exato['data_pedido']
+                update = """
+                    UPDATE pedido 
+                    SET total_produtos = %s, total_pedido = %s
+                    WHERE cpf_cliente = %s AND data_pedido = %s
+                """
+                self.db.execute_statement(update, (
+                    total_produtos,
+                    total_pedido,
+                    cpf, data_pedido_exata
+                ))
+                print(f"Totais atualizados: total_produtos={total_produtos}, total_pedido={total_pedido:.2f}")
+            else:
+                print(f"Aviso: Pedido não encontrado para atualizar totais. CPF: {cpf}, Data: {data_pedido}")
+        else:
+            # Se não há produtos, zera os totais
+            query_pedido_exato = """
+                SELECT data_pedido
+                FROM pedido
+                WHERE cpf_cliente = %s
+                    AND data_pedido >= %s - INTERVAL '1 second'
+                    AND data_pedido <= %s + INTERVAL '1 second'
+                LIMIT 1
+            """
+            pedido_exato = self.db.execute_select_one(query_pedido_exato, (cpf, data_pedido, data_pedido))
+            
+            if pedido_exato:
+                data_pedido_exata = pedido_exato['data_pedido']
+                update = """
+                    UPDATE pedido 
+                    SET total_produtos = 0, total_pedido = 0
+                    WHERE cpf_cliente = %s AND data_pedido = %s
+                """
+                self.db.execute_statement(update, (cpf, data_pedido_exata))
+                print(f"Totais zerados: pedido sem produtos. CPF: {cpf}, Data: {data_pedido_exata}")
 
     def _atualizar_estoque_pedido(self, cpf: str, data_pedido: datetime, restaurar: bool = False):
         """Atualiza o estoque dos produtos de um pedido

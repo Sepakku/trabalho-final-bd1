@@ -201,6 +201,10 @@ async function adicionarAoCarrinho(idProduto) {
         if (response.ok) {
             mostrarMensagem('Produto adicionado ao carrinho!', 'success');
             produtoPendente = null; // Limpa produto pendente
+            // Atualiza a visualização do carrinho após um pequeno delay para garantir que o backend atualizou os totais
+            setTimeout(() => {
+                visualizarCarrinho();
+            }, 300);
         } else {
             // Verifica se o erro é porque o comprador não existe
             if (result.error === 'comprador_nao_existe' || response.status === 404) {
@@ -358,6 +362,10 @@ async function cadastrarComprador(event) {
                         const carrinhoResult = await carrinhoResponse.json();
                         if (carrinhoResponse.ok) {
                             mostrarMensagem('Produto adicionado ao carrinho!', 'success');
+                            // Atualiza a visualização do carrinho
+                            setTimeout(() => {
+                                visualizarCarrinho();
+                            }, 300);
                         } else {
                             mostrarMensagem(carrinhoResult.error || 'Erro ao adicionar produto ao carrinho', 'error');
                         }
@@ -684,24 +692,55 @@ async function visualizarCarrinho() {
         // Formatar data do pedido para o botão de finalizar
         const dataPedidoParaBotao = dataPedidoFormatada || pedidoCarrinho.data_pedido;
         
+        // Calcula o total dos itens caso o total do pedido não esteja correto
+        let totalCalculado = parseFloat(pedidoCarrinho.total_pedido || 0);
+        let totalItens = parseInt(pedidoCarrinho.total_produtos || 0);
+        
+        if (detalhes && detalhes.itens && detalhes.itens.length > 0) {
+            // Recalcula o total baseado nos itens
+            const totalRecalculado = detalhes.itens.reduce((sum, item) => {
+                const subtotal = parseFloat(item.subtotal || 0);
+                return sum + subtotal;
+            }, 0);
+            
+            // Usa o total recalculado se for diferente (com margem de erro de 0.01)
+            if (Math.abs(totalCalculado - totalRecalculado) > 0.01) {
+                totalCalculado = totalRecalculado;
+                console.warn('Total do pedido inconsistente, usando total recalculado dos itens');
+            }
+            
+            // Recalcula a quantidade total de itens
+            const quantidadeRecalculada = detalhes.itens.reduce((sum, item) => {
+                return sum + parseInt(item.quantidade || 0);
+            }, 0);
+            
+            if (totalItens !== quantidadeRecalculada) {
+                totalItens = quantidadeRecalculada;
+                console.warn('Quantidade de itens inconsistente, usando quantidade recalculada');
+            }
+        }
+        
         container.innerHTML = `
             <div class="carrinho-item" style="background-color: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <h4>Carrinho</h4>
-                <p><strong>Total:</strong> R$ ${parseFloat(pedidoCarrinho.total_pedido || 0).toFixed(2)}</p>
-                <p><strong>Quantidade de itens:</strong> ${pedidoCarrinho.total_produtos || 0}</p>
+                <p><strong>Total:</strong> R$ ${totalCalculado.toFixed(2)}</p>
+                <p><strong>Quantidade de itens:</strong> ${totalItens}</p>
                 ${detalhes && detalhes.itens && detalhes.itens.length > 0 ? `
                     <h5 style="margin-top: 1rem;">Itens do carrinho:</h5>
                     <ul style="margin-top: 0.5rem; list-style: none; padding: 0;">
-                        ${detalhes.itens.map(item => `
+                        ${detalhes.itens.map(item => {
+                            const subtotal = parseFloat(item.subtotal || 0);
+                            return `
                             <li style="padding: 0.5rem; background-color: #f9f9f9; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <strong>${item.nome_produto}</strong> - Qtd: ${item.quantidade} - R$ ${parseFloat(item.subtotal || 0).toFixed(2)}
+                                    <strong>${item.nome_produto}</strong> - Qtd: ${item.quantidade} - R$ ${subtotal.toFixed(2)}
                                 </div>
                                 <button onclick="removerDoCarrinho(${item.id_produto})" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; margin-left: 1rem;">
                                     Remover
                                 </button>
                             </li>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </ul>
                 ` : '<p style="margin-top: 1rem; color: #666;">Detalhes dos itens não disponíveis no momento.</p>'}
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #ddd;">
