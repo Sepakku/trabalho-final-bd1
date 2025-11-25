@@ -76,7 +76,7 @@ CREATE TABLE Pedido (
         total_produtos INT DEFAULT 0,
         total_pedido NUMERIC(10, 2) DEFAULT 0,
         
-        CONSTRAINT chk_pedido_status CHECK (status_pedido IN ('pendente','aguardando pagamento','pagamento confirmado','enviado', 'entregue', 'cancelado')), // esse check tem que ser alterado caso o banco de dados ja esteja carregado
+        CONSTRAINT chk_pedido_status CHECK (status_pedido IN ('pendente','aguardando pagamento','pagamento confirmado','enviado', 'entregue', 'cancelado')),
         CONSTRAINT chk_pedido_total_produtos CHECK (total_produtos >= 0),
         CONSTRAINT chk_pedido_total CHECK (total_pedido >= 0),
         PRIMARY KEY (cpf_cliente, data_pedido),
