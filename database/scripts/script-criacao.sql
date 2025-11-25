@@ -119,7 +119,6 @@ CREATE TABLE Entrega (
         data_envio TIMESTAMP,         
         data_prevista TIMESTAMP,         
         frete NUMERIC(10, 2) DEFAULT 0,
-        endereco_vendedor TEXT,         
         -- FK para o Pedido (1:1)         
         fk_cpf_cliente CHAR(11) NOT NULL,         
         fk_data_pedido TIMESTAMP NOT NULL,         
