@@ -194,7 +194,8 @@ INSERT INTO Pedido (cpf_cliente, status_pedido, total_produtos, total_pedido, da
 ('23456789001', 'enviado', 5, 450.00, '2025-10-22'),
 ('34567890122', 'pendente', 3, 250.00, '2025-10-23'),
 ('45678901233', 'enviado', 2, 120.00, '2025-10-24'),
-('56789012344', 'entregue', 4, 500.00, '2025-10-25');
+('56789012344', 'entregue', 4, 500.00, '2025-10-25'),
+('12345678901', 'cancelado', 2, 180.00, '2025-10-26');
 
 -- Inserção de dados na tabela Pagamento
 INSERT INTO Pagamento (status_pagamento, valor_pago, metodo_pagamento, num_parcelas, fk_cpf_vendedor, fk_cpf_cliente, fk_data_pedido) VALUES
@@ -221,7 +222,8 @@ INSERT INTO Pagamento (status_pagamento, valor_pago, metodo_pagamento, num_parce
 ('aprovado', 400.00, 'Boleto', 1, '23456789001', '12345678900', '2025-10-21'),
 ('pendente', 500.00, 'Pix', 3, '34567890122', '23456789001', '2025-10-22'),
 ('aprovado', 600.00, 'Cartão de Crédito', 1, '45678901233', '34567890122', '2025-10-23'),
-('pendente', 250.00, 'Boleto', 2, '56789012344', '45678901233', '2025-10-24');
+('pendente', 250.00, 'Boleto', 2, '56789012344', '45678901233', '2025-10-24'),
+('rejeitado', 180.00, 'Pix', 1, '12345678901', '12345678901', '2025-10-26');
 -- Inserção de dados na tabela Entrega
 INSERT INTO Entrega (status_entrega, metodo_entrega, endereco_entrega, data_envio, data_prevista, frete, fk_cpf_cliente, fk_data_pedido, fk_cpf_vendedor) VALUES
 ('preparando', 'Correios', 'Rua A, 123, Bairro X', '2025-10-05', '2025-10-10', 15.00, '12345678901', '2025-10-01', '12345678901'),
@@ -246,7 +248,8 @@ INSERT INTO Entrega (status_entrega, metodo_entrega, endereco_entrega, data_envi
 ('enviado', 'Transportadora', 'Rua T, 1701, Bairro G', '2025-10-24', '2025-10-29', 12.00, '01209876543', '2025-10-20', '01209876543'),
 ('preparando', 'Correios', 'Rua U, 1801, Bairro F', '2025-10-25', '2025-10-30', 16.00, '12345678900', '2025-10-21', '12345678900'),
 ('falha', 'Transportadora', 'Rua V, 1901, Bairro E', '2025-10-26', '2025-10-31', 18.00, '23456789001', '2025-10-22', '23456789001'),
-('enviado', 'Correios', 'Rua W, 2001, Bairro D', '2025-10-27', '2025-11-01', 20.00, '34567890122', '2025-10-23', '34567890122');
+('enviado', 'Correios', 'Rua W, 2001, Bairro D', '2025-10-27', '2025-11-01', 20.00, '34567890122', '2025-10-23', '34567890122'),
+('preparando', 'Transportadora', 'Rua X, 2101, Bairro C', '2025-10-28', '2025-11-02', 15.00, '12345678901', '2025-10-26', '12345678901');
 -- Inserção de dados na tabela Solicitacao
 INSERT INTO Solicitacao (cpf_cliente, data_pedido, data_solicitacao, tipo, status_solicitacao) VALUES
 ('12345678901', '2025-10-01', '2025-10-02', 'devolucao', 'aberta'),
@@ -272,7 +275,8 @@ INSERT INTO Solicitacao (cpf_cliente, data_pedido, data_solicitacao, tipo, statu
 ('12345678900', '2025-10-21', '2025-10-22', 'devolucao', 'aberta'),
 ('23456789001', '2025-10-22', '2025-10-23', 'troca', 'concluida'),
 ('34567890122', '2025-10-23', '2025-10-24', 'suporte', 'aberta'),
-('45678901233', '2025-10-24', '2025-10-25', 'cancelamento', 'em_analise');
+('45678901233', '2025-10-24', '2025-10-25', 'cancelamento', 'em_analise'),
+('12345678901', '2025-10-26', '2025-10-27', 'devolucao', 'aberta');
 -- Inserção de dados na tabela ContemProd
 INSERT INTO ContemProd (cpf_cliente, data_pedido, id_produto, quantidade) VALUES
 ('12345678901', '2025-10-01', 1, 2),
@@ -299,7 +303,8 @@ INSERT INTO ContemProd (cpf_cliente, data_pedido, id_produto, quantidade) VALUES
 ('23456789001', '2025-10-22', 22, 1),
 ('34567890122', '2025-10-23', 23, 4),
 ('45678901233', '2025-10-24', 24, 2),
-('56789012344', '2025-10-25', 25, 1);
+('56789012344', '2025-10-25', 25, 1),
+('12345678901', '2025-10-26', 1, 2);
 -- Inserção de dados na tabela AssociaProd
 INSERT INTO AssociaProd (cpf_cliente, data_pedido, data_solicitacao, id_produto) VALUES
 ('12345678901', '2025-10-01', '2025-10-02', 1),
@@ -325,7 +330,8 @@ INSERT INTO AssociaProd (cpf_cliente, data_pedido, data_solicitacao, id_produto)
 ('12345678900', '2025-10-21', '2025-10-22', 21),
 ('23456789001', '2025-10-22', '2025-10-23', 22),
 ('34567890122', '2025-10-23', '2025-10-24', 23),
-('45678901233', '2025-10-24', '2025-10-25', 24);
+('45678901233', '2025-10-24', '2025-10-25', 24),
+('12345678901', '2025-10-26', '2025-10-27', 1);
 
 -- Inserção de dados na tabela AvaliaProd
 INSERT INTO AvaliaProd (cpf_comprador, id_produto, nota) VALUES
