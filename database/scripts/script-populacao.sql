@@ -275,7 +275,7 @@ INSERT INTO Solicitacao (cpf_cliente, data_pedido, data_solicitacao, tipo, statu
 ('45678901233', '2025-10-24', '2025-10-25', 'cancelamento', 'em_analise');
 -- Inserção de dados na tabela ContemProd
 INSERT INTO ContemProd (cpf_cliente, data_pedido, id_produto, quantidade) VALUES
-('12345678901', '2025-10-01', 1, 2),
+('12345678901', '2025-10-01', 1, 3),
 ('23456789012', '2025-10-02', 2, 1),
 ('34567890123', '2025-10-03', 3, 3),
 ('45678901234', '2025-10-04', 4, 1),
