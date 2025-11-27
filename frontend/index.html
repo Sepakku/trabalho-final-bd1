@@ -93,7 +93,7 @@
             
             <div class="section" style="background-color: #f0f0f0; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
                 <h3>Meu CPF</h3>
-                <input type="text" id="vendedor-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;">
+                <input type="text" id="vendedor-cpf-principal" placeholder="Informe seu CPF (ex: 12345678901)" style="width: 300px; padding: 0.5rem; font-size: 1rem;" onchange="carregarAlertasEstoque()">
                 <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">Todas as operações usarão este CPF</p>
             </div>
             
@@ -101,6 +101,12 @@
                 <h3>Informações do Vendedor</h3>
                 <button onclick="carregarDadosVendedor()" class="btn btn-primary">Carregar Dados</button>
                 <div id="vendedor-info"></div>
+            </div>
+
+            <div class="section" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <h3 style="color: #856404;">⚠️ Alertas de Estoque Baixo</h3>
+                <button onclick="carregarAlertasEstoque()" class="btn btn-warning">Verificar Estoque</button>
+                <div id="alertas-estoque-lista" style="margin-top: 1rem;"></div>
             </div>
 
             <div class="section">

@@ -1166,6 +1166,8 @@ async function carregarDadosVendedor() {
                     <p><strong>Nome:</strong> ${vendedor.pnome} ${vendedor.sobrenome}</p>
                 </div>
             `;
+            // Carrega alertas de estoque automaticamente após carregar dados
+            carregarAlertasEstoque();
         } else {
             if (vendedor.error === 'Vendedor não encontrado') {
                 mostrarModalCadastroVendedor(cpf);
@@ -1176,6 +1178,114 @@ async function carregarDadosVendedor() {
     } catch (error) {
         console.error('Erro:', error);
         mostrarMensagem('Erro ao carregar dados do vendedor', 'error');
+    }
+}
+
+async function carregarAlertasEstoque() {
+    const cpf = obterCPFVendedor();
+    if (!cpf) {
+        const container = document.getElementById('alertas-estoque-lista');
+        container.innerHTML = '<p style="color: #666;">Informe seu CPF para verificar alertas de estoque.</p>';
+        return;
+    }
+
+    // Verifica se o vendedor existe
+    const vendedorExiste = await verificarVendedorExiste(cpf);
+    if (!vendedorExiste) {
+        const container = document.getElementById('alertas-estoque-lista');
+        container.innerHTML = '<p style="color: #666;">Vendedor não encontrado. Cadastre-se primeiro.</p>';
+        return;
+    }
+
+    const container = document.getElementById('alertas-estoque-lista');
+    container.innerHTML = '<p>Carregando alertas...</p>';
+
+    try {
+        const response = await fetch(`${API_URL}/vendedor/produtos/estoque-baixo?cpf=${cpf}`);
+        
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status} ao buscar alertas de estoque`);
+        }
+        
+        const produtos = await response.json();
+        
+        if (!produtos || produtos.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 1rem; background-color: #d4edda; border-radius: 4px; color: #155724;">
+                    <strong>✅ Nenhum produto com estoque baixo!</strong>
+                    <p style="margin: 0.5rem 0 0 0;">Todos os seus produtos estão com estoque adequado.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Ordena por estoque (menor primeiro)
+        produtos.sort((a, b) => (a.estoque_atual || 0) - (b.estoque_atual || 0));
+
+        container.innerHTML = `
+            <div style="padding: 1rem; background-color: #f8d7da; border-radius: 4px; color: #721c24; margin-bottom: 1rem;">
+                <strong>⚠️ Atenção: ${produtos.length} produto(s) com estoque baixo!</strong>
+            </div>
+            <div style="display: grid; gap: 1rem;">
+                ${produtos.map(produto => {
+                    const estoqueAtual = parseInt(produto.estoque_atual || 0);
+                    const alertaEstoque = parseInt(produto.alerta_estoque || 0);
+                    const percentual = alertaEstoque > 0 ? Math.round((estoqueAtual / alertaEstoque) * 100) : 0;
+                    const corAlerta = estoqueAtual === 0 ? '#dc3545' : (estoqueAtual <= alertaEstoque * 0.5 ? '#fd7e14' : '#ffc107');
+                    
+                    return `
+                        <div style="padding: 1rem; background-color: #fff; border-left: 4px solid ${corAlerta}; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <div>
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #333;">${produto.nome_produto || 'Produto sem nome'}</h4>
+                                    <p style="margin: 0; color: #666; font-size: 0.9rem;">ID: ${produto.id_produto}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: ${corAlerta};">
+                                        ${estoqueAtual}
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        unidades
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #eee;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="color: #666; font-size: 0.9rem;">Alerta configurado:</span>
+                                    <span style="font-weight: bold; color: #333;">${alertaEstoque} unidades</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: #666; font-size: 0.9rem;">Preço:</span>
+                                    <span style="font-weight: bold; color: #333;">R$ ${parseFloat(produto.preco || 0).toFixed(2)}</span>
+                                </div>
+                                ${estoqueAtual === 0 ? `
+                                    <div style="margin-top: 0.5rem; padding: 0.5rem; background-color: #f8d7da; border-radius: 4px; color: #721c24; font-size: 0.9rem;">
+                                        <strong>🔴 ESTOQUE ZERADO!</strong> Reabasteça urgentemente.
+                                    </div>
+                                ` : estoqueAtual <= alertaEstoque * 0.5 ? `
+                                    <div style="margin-top: 0.5rem; padding: 0.5rem; background-color: #fff3cd; border-radius: 4px; color: #856404; font-size: 0.9rem;">
+                                        <strong>🟠 Estoque crítico!</strong> Reabasteça em breve.
+                                    </div>
+                                ` : `
+                                    <div style="margin-top: 0.5rem; padding: 0.5rem; background-color: #fff3cd; border-radius: 4px; color: #856404; font-size: 0.9rem;">
+                                        <strong>🟡 Estoque abaixo do alerta.</strong> Considere reabastecer.
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Erro ao carregar alertas de estoque:', error);
+        container.innerHTML = `
+            <div style="padding: 1rem; background-color: #f8d7da; border-radius: 4px; color: #721c24;">
+                <strong>Erro ao carregar alertas de estoque.</strong>
+                <p style="margin: 0.5rem 0 0 0;">Por favor, tente novamente.</p>
+            </div>
+        `;
+        mostrarMensagem('Erro ao carregar alertas de estoque', 'error');
     }
 }
 
@@ -1316,6 +1426,8 @@ async function atualizarEstoque(idProduto) {
         if (response.ok) {
             mostrarMensagem('Estoque atualizado com sucesso!', 'success');
             carregarProdutosVendedor();
+            // Recarrega alertas de estoque após atualizar
+            carregarAlertasEstoque();
         } else {
             mostrarMensagem(result.error || 'Erro ao atualizar estoque', 'error');
         }
@@ -1568,6 +1680,8 @@ async function adicionarProduto() {
             document.getElementById('novo-produto-alerta').value = '0';
             document.getElementById('novo-produto-origem').value = '';
             carregarProdutosVendedor();
+            // Recarrega alertas de estoque após adicionar produto
+            carregarAlertasEstoque();
         } else {
             if (result.error === 'vendedor_nao_existe') {
                 produtoPendenteVendedor = {
