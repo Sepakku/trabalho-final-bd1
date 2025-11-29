@@ -39,13 +39,22 @@ Sistema de e-commerce simples com duas interfaces principais: uma para comprador
    password="sua_senha_aqui"
    ```
 
-2. Instale as dependências:
+2. Crie a venv na raiz do projeto:
+   ```bash
+   python -m venv venv
+   ```
+3. Ative a venv:
+   ```bash
+   .\venv\Scripts\activate
+   ```
+
+4. Instale as dependências:
    ```bash
    cd backend
    pip install -r requirements.txt
    ```
 
-3. Execute o servidor:
+5. Execute o servidor:
    ```bash
    python -m backend.main
    ```
